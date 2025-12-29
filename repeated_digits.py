@@ -28,10 +28,10 @@ KEY_COLUMN = (
 del ndigitssub1
 
 
-def get_divisors(ndigits: int, /):
+def get_divisors(ndigits: int, /) -> pl.DataFrame:
     initial_df = pl.DataFrame(
         ((1, ndigits),),
-        dict.fromkeys(("subndigits", "repeats"), int),
+        dict.fromkeys(("subndigits", "repeats"), pl.Int64),
         orient="row",
     )
     if possible_factors := range(2, isqrt(ndigits) + 1):
