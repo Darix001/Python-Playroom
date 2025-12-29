@@ -38,7 +38,8 @@ def get_divisors(ndigits: int, /) -> pl.DataFrame:
             divisors := pl.LazyFrame(
                 {
                     "factors": possible_factors,
-                }
+                },
+                {"factors": pl.Int64},
             )
             .with_columns(
                 coefficient=ndigits // pl.col.factors,
