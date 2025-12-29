@@ -14,23 +14,19 @@ def mul_string(expr: pl.Expr, n: pl.Expr | int) -> pl.Expr:
 
 
 ndigitssub1 = c.subndigits - 1
-KEY_COLUMN = (
-    pl.concat_str(
-        one := string_lit(1),
-        mul_string(
-            pl.concat_str(mul_string(string_lit(0), ndigitssub1), one), c.repeats - 1
-        ),
-    )
-    .cast(int)
-    .alias("key")
-)
+KEY_COLUMN = pl.concat_str(
+    one := string_lit(1),
+    mul_string(
+        pl.concat_str(mul_string(string_lit(0), ndigitssub1), one), c.repeats - 1
+    ),
+).alias("key")
 del ndigitssub1
 
 
-def get_divisors(ndigits: int, /) -> pl.DataFrame:
+def get_divisors(ndigits: int, /, dtype=pl.UInt8, keys_type=pl.UInt64) -> pl.DataFrame:
     initial_df = pl.DataFrame(
         ((1, ndigits),),
-        dict.fromkeys(("subndigits", "repeats"), pl.Int64),
+        dict.fromkeys(("subndigits", "repeats"), dtype),
         orient="row",
     )
     if possible_factors := range(2, isqrt(ndigits) + 1):
@@ -39,7 +35,7 @@ def get_divisors(ndigits: int, /) -> pl.DataFrame:
                 {
                     "factors": possible_factors,
                 },
-                {"factors": pl.Int64},
+                {"factors": dtype},
             )
             .with_columns(
                 coefficient=ndigits // pl.col.factors,
@@ -55,11 +51,11 @@ def get_divisors(ndigits: int, /) -> pl.DataFrame:
         if not inverted.is_empty():
             initial_df.extend(inverted)
 
-    initial_df = initial_df.with_columns(KEY_COLUMN).shrink_to_fit()
+    initial_df = initial_df.with_columns(KEY_COLUMN.cast(keys_type)).shrink_to_fit()
     return initial_df
 
 
 if __name__ == "__main__":
     from sys import argv
 
-    print(get_divisors(int(argv[1])))
+    print(get_divisors(int(argv[1])).estimated_size())
