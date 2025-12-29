@@ -1,5 +1,4 @@
 from math import isqrt
-from operator import methodcaller
 
 import polars as pl
 
