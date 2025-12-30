@@ -79,7 +79,6 @@ def subdigit_repeats(
             .select(pl.all().append(pl.nth(1, 0).filter(c.subndigits != c.repeats)))
         ).collect()
     )
-    return initial_df
 
     if gen_keys:
         initial_df = initial_df.with_columns(KEY_COLUMN.cast(keys_type))
