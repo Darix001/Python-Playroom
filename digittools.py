@@ -73,9 +73,9 @@ def subdigit_repeats(
                 )
             )
             .with_columns(
-                repeats=ndigits // pl.col.subndigits,
+                repeats=ndigits // c.subndigits,
             )
-            .filter((ndigits % pl.col.subndigits) == 0)
+            .filter((ndigits % c.subndigits) == 0)
             .select(pl.all().append(pl.nth(1, 0).filter(c.subndigits != c.repeats)))
         ).collect()
     )
