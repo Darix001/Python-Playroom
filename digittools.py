@@ -112,3 +112,4 @@ def ndigits(n: int) -> int:
 if __name__ == "__main__":
     print(subdigit_repeats(6, gen_keys=True, keys_type=str))
     print(ndigits(1234567890))
+    print(digit_range(5))
