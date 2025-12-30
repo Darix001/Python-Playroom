@@ -64,26 +64,25 @@ def subdigit_repeats(
         dict.fromkeys(("subndigits", "repeats"), dtype),
         orient="row",
     )
-    if possible_factors := range(2, math.isqrt(ndigits) + 1):
-        initial_df.extend(
-            divisors := pl.LazyFrame(
-                {
-                    "factors": possible_factors,
-                },
-                {"factors": dtype},
+    initial_df.extend(
+        divisors := (
+            initial_df.lazy()
+            .select(
+                pl.int_range(2, c.repeats.first().sqrt() + 1, dtype=dtype).alias(
+                    "subndigits"
+                )
             )
             .with_columns(
-                coefficient=ndigits // pl.col.factors,
-                mod=ndigits % pl.col.factors,
+                repeats=ndigits // pl.col.subndigits,
             )
-            .filter(mod=0)
-            .select(subndigits="factors", repeats="coefficient")
-            .collect()
-        )
-        inverted = divisors.filter(c.subndigits != c.repeats)[:, ::-1]
-        inverted.columns = initial_df.columns
-        if not inverted.is_empty():
-            initial_df.extend(inverted)
+            .filter((ndigits % pl.col.subndigits) == 0)
+        ).collect()
+    )
+
+    inverted = divisors.filter(c.subndigits != c.repeats)[:, ::-1]
+    inverted.columns = initial_df.columns
+    if not inverted.is_empty():
+        initial_df.extend(inverted)
 
     if gen_keys:
         initial_df = initial_df.with_columns(KEY_COLUMN.cast(keys_type))
