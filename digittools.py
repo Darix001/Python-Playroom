@@ -65,7 +65,7 @@ def subdigit_repeats(
         orient="row",
     )
     initial_df.extend(
-        divisors := (
+        (
             initial_df.lazy()
             .select(
                 pl.int_range(2, c.repeats.first().sqrt() + 1, dtype=dtype).alias(
@@ -76,13 +76,10 @@ def subdigit_repeats(
                 repeats=ndigits // pl.col.subndigits,
             )
             .filter((ndigits % pl.col.subndigits) == 0)
+            .select(pl.all().append(pl.nth(1, 0).filter(c.subndigits != c.repeats)))
         ).collect()
     )
-
-    inverted = divisors.filter(c.subndigits != c.repeats)[:, ::-1]
-    inverted.columns = initial_df.columns
-    if not inverted.is_empty():
-        initial_df.extend(inverted)
+    return initial_df
 
     if gen_keys:
         initial_df = initial_df.with_columns(KEY_COLUMN.cast(keys_type))
