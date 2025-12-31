@@ -1,28 +1,19 @@
 import math
+import operator as op
 
 import polars as pl
 
-c = pl.col
-
-
-def string_lit(value) -> pl.Expr:
-    return pl.lit(value, pl.String)
-
-
-def mul_string(expr: pl.Expr, n: pl.Expr | int) -> pl.Expr:
-    return expr.repeat_by(n).list.join("")
-
-
 base_df = pl.DataFrame(
     ((1, 0),),
-    dict.fromkeys(cols := ("subndigits", "repeats"), pl.UInt8),
+    dict.fromkeys(col_names := ("subndigits", "repeats"), pl.UInt8),
     orient="row",
 )
-minv_col = mul_string(string_lit(1).str.zfill(c.subndigits), c.repeats).alias("minv")
+cols = tuple(col_names := map(pl.col, col_names))
+minv_col = pl.lit("1").str.zfill(cols[0]).repeat_by(cols[1]).list.join("").alias("minv")
 fact_range = pl.int_range(
-    2, c.repeats.first().sqrt() + 1, dtype=pl.dtype_of("repeats")
+    2, cols[1].first().sqrt() + 1, dtype=pl.dtype_of("repeats")
 ).alias("subndigits")
-with_inverted_ne = pl.all().append(pl.nth(1, 0).filter(c.subndigits != c.repeats))
+with_inverted_ne = pl.all().append(pl.nth(range(2)).filter(op.ne(*cols)))
 
 
 def subdigit_repeats(
@@ -70,9 +61,9 @@ def subdigit_repeats(
             initial_df.lazy()
             .select(fact_range)
             .with_columns(
-                repeats=ndigits // c.subndigits,
+                repeats=ndigits // cols[0],
             )
-            .filter((ndigits % c.subndigits) == 0)
+            .filter((ndigits % cols[0]) == 0)
             .select(with_inverted_ne)
         ).collect()
     )
