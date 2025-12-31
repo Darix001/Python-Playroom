@@ -8,13 +8,13 @@ base_df = pl.LazyFrame(
     dict.fromkeys(col_names := ("subndigits", "repeats"), pl.UInt8),
     orient="row",
 )
-cols: tuple[pl.Expr, ...] = tuple(col_names := map(pl.col, col_names))
+cols: tuple[pl.Expr, ...] = tuple(map(pl.col, col_names))
 minv_col = pl.lit("1").str.zfill(cols[0]).repeat_by(cols[1]).list.join("").alias("minv")
 repeat_type = pl.dtype_of("repeats")
 fact_range = pl.int_range(
     2, cols[1].first().sqrt().cast(repeat_type) + 1, dtype=pl.dtype_of("repeats")
 ).alias("subndigits")
-with_inverted_ne = pl.all().append(pl.nth(range(2)).filter(op.ne(*cols)))
+with_inverted_ne = pl.all().append(pl.col(*col_names[::-1])).filter(op.ne(*cols))
 
 
 def subdigit_repeats(
