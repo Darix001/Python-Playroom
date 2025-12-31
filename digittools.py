@@ -3,15 +3,16 @@ import operator as op
 
 import polars as pl
 
-base_df = pl.DataFrame(
+base_df = pl.LazyFrame(
     ((1, 0),),
     dict.fromkeys(col_names := ("subndigits", "repeats"), pl.UInt8),
     orient="row",
 )
-cols = tuple(col_names := map(pl.col, col_names))
+cols: tuple[pl.Expr, ...] = tuple(col_names := map(pl.col, col_names))
 minv_col = pl.lit("1").str.zfill(cols[0]).repeat_by(cols[1]).list.join("").alias("minv")
+repeat_type = pl.dtype_of("repeats")
 fact_range = pl.int_range(
-    2, cols[1].first().sqrt() + 1, dtype=pl.dtype_of("repeats")
+    2, cols[1].first().sqrt().cast(repeat_type) + 1, dtype=pl.dtype_of("repeats")
 ).alias("subndigits")
 with_inverted_ne = pl.all().append(pl.nth(range(2)).filter(op.ne(*cols)))
 
@@ -55,23 +56,20 @@ def subdigit_repeats(
         └────────────┴─────────┴────────┘
     """
     initial_df = base_df.with_columns(pl.nth(1).replace(0, ndigits))
-
-    initial_df.extend(
-        (
-            initial_df.lazy()
-            .select(fact_range)
-            .with_columns(
-                repeats=ndigits // cols[0],
-            )
-            .filter((ndigits % cols[0]) == 0)
-            .select(with_inverted_ne)
-        ).collect()
+    new_df = (
+        initial_df.select(fact_range)
+        .with_columns(
+            repeats=ndigits // cols[0],
+        )
+        .filter((ndigits % cols[0]) == 0)
+        .select(with_inverted_ne)
     )
+    initial_df = pl.concat([initial_df, new_df])
 
     if minv:
         initial_df = initial_df.with_columns(minv_col.cast(minv_dtype))
 
-    return initial_df
+    return initial_df.collect()
 
 
 def digit_range(ndigits: int, /) -> range:
