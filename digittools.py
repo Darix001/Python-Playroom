@@ -55,7 +55,7 @@ def subdigit_repeats(
         │ 3          ┆ 2       ┆ 001001 │
         └────────────┴─────────┴────────┘
     """
-    initial_df = base_df.with_columns(pl.nth(1).replace(0, ndigits))
+    initial_df = base_df.with_columns(cols[1].replace(0, ndigits))
     new_df = (
         initial_df.select(fact_range)
         .with_columns(
