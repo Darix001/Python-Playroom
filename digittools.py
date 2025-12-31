@@ -13,27 +13,31 @@ def mul_string(expr: pl.Expr, n: pl.Expr | int) -> pl.Expr:
     return expr.repeat_by(n).list.join("")
 
 
-KEY_COLUMN = mul_string(string_lit(1).str.zfill(c.subndigits), c.repeats).alias("key")
+base_df = pl.DataFrame(
+    ((1, 0),),
+    dict.fromkeys(cols := ("subndigits", "repeats"), pl.UInt8),
+    orient="row",
+)
+minv_col = mul_string(string_lit(1).str.zfill(c.subndigits), c.repeats).alias("minv")
+fact_range = pl.int_range(
+    2, c.repeats.first().sqrt() + 1, dtype=pl.dtype_of("repeats")
+).alias("subndigits")
+with_inverted_ne = pl.all().append(pl.nth(1, 0).filter(c.subndigits != c.repeats))
 
 
 def subdigit_repeats(
     ndigits: int,
     /,
-    gen_keys: bool = False,
-    dtype: type | pl.DataType = pl.UInt8,
-    keys_type: type | pl.DataType = pl.UInt64,
+    minv: bool = False,
+    minv_dtype: type | pl.DataType = pl.UInt64,
 ) -> pl.DataFrame:
     """Return a DataFrame with subdigit repeats for a given number of digits.
 
     Parameters:
         ndigits (int): The number of digits to generate subdigit repeats for.
-        gen_keys (bool): Whether to generate keys for each subdigit repeat.
-        dtype (type | pl.DataType): The data type to use for the subdigit and repeat columns.
-        keys_type (type | pl.DataType): The data type to use for the key column.
+        minv (bool): Whether to generate the minimum value for each subdigit repeat.
+        minv_dtype (type | pl.DataType): The data type to use for the minv column.
 
-        the keys represents the lowest possible subdigit repeat,
-        which is the smallest number that can be repeated to form the given number of digits.
-        This column is by default casted to UInt64.
     Returns:
         pl.DataFrame: A DataFrame with subdigit repeats for the given number of digits.
 
@@ -59,29 +63,22 @@ def subdigit_repeats(
         │ 3          ┆ 2       ┆ 001001 │
         └────────────┴─────────┴────────┘
     """
-    initial_df = pl.DataFrame(
-        ((1, ndigits),),
-        dict.fromkeys(("subndigits", "repeats"), dtype),
-        orient="row",
-    )
+    initial_df = base_df.with_columns(pl.nth(1).replace(0, ndigits))
+
     initial_df.extend(
         (
             initial_df.lazy()
-            .select(
-                pl.int_range(2, c.repeats.first().sqrt() + 1, dtype=dtype).alias(
-                    "subndigits"
-                )
-            )
+            .select(fact_range)
             .with_columns(
                 repeats=ndigits // c.subndigits,
             )
             .filter((ndigits % c.subndigits) == 0)
-            .select(pl.all().append(pl.nth(1, 0).filter(c.subndigits != c.repeats)))
+            .select(with_inverted_ne)
         ).collect()
     )
 
-    if gen_keys:
-        initial_df = initial_df.with_columns(KEY_COLUMN.cast(keys_type))
+    if minv:
+        initial_df = initial_df.with_columns(minv_col.cast(minv_dtype))
 
     return initial_df
 
@@ -105,6 +102,6 @@ def ndigits(n: int) -> int:
 
 
 if __name__ == "__main__":
-    print(subdigit_repeats(6, gen_keys=True, keys_type=str))
+    print(subdigit_repeats(6, minv=True, minv_dtype=str))
     print(ndigits(1234567890))
     print(digit_range(5))
