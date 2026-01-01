@@ -64,7 +64,7 @@ def subdigit_repeats(
         .select(with_inverted_ne)
     )
     initial_df = pl.concat((initial_df, new_df))
-    print(initial_df.explain())
+
     if minv:
         initial_df = initial_df.with_columns(minv_col.cast(minv_dtype))
 
