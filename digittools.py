@@ -3,32 +3,29 @@ import operator as op
 
 import polars as pl
 
-base_df = pl.LazyFrame(
-    ((1, 0),),
-    dict.fromkeys(col_names := ("subndigits", "repeats"), pl.UInt8),
-    orient="row",
-)
-cols: tuple[pl.Expr, ...] = tuple(map(pl.col, col_names))
+cols: tuple[pl.Expr, ...] = tuple(map(pl.col, col_names := ("subndigits", "repeats")))
 minv_col = pl.lit("1").str.zfill(cols[0]).repeat_by(cols[1]).list.join("").alias("minv")
 repeat_type = pl.dtype_of("repeats")
 fact_range = pl.int_range(
-    2, cols[1].first().sqrt().cast(repeat_type) + 1, dtype=pl.dtype_of("repeats")
+    2, cols[1].first().sqrt().cast(repeat_type) + 1, dtype=repeat_type
 ).alias("subndigits")
 with_inverted_ne = pl.all().append(pl.col(*col_names[::-1])).filter(op.ne(*cols))
 
 
 def subdigit_repeats(
     ndigits: int,
+    dtype: type | pl.DataType | pl.DataTypeExpr = pl.UInt8,
     /,
     minv: bool = False,
-    minv_dtype: type | pl.DataType = pl.UInt64,
+    minv_dtype: type | pl.DataType | pl.DataTypeExpr = pl.UInt64,
 ) -> pl.DataFrame:
     """Return a DataFrame with subdigit repeats for a given number of digits.
 
     Parameters:
         ndigits (int): The number of digits to generate subdigit repeats for.
+        dtype (type | pl.DataType | pl.DataTypeExpr): main dtype of the dataframe
         minv (bool): Whether to generate the minimum value for each subdigit repeat.
-        minv_dtype (type | pl.DataType): The data type to use for the minv column.
+        minv_dtype (type | pl.DataType | pl.DataTypeExpr): The data type to use for the minv column.
 
     Returns:
         pl.DataFrame: A DataFrame with subdigit repeats for the given number of digits.
@@ -55,7 +52,9 @@ def subdigit_repeats(
         │ 3          ┆ 2       ┆ 001001 │
         └────────────┴─────────┴────────┘
     """
-    initial_df = base_df.with_columns(cols[1].replace(0, ndigits))
+    initial_df = pl.LazyFrame(
+        ((1, ndigits),), dict.fromkeys(col_names, dtype), orient="row"
+    )
     new_df = (
         initial_df.select(fact_range)
         .with_columns(
@@ -64,8 +63,8 @@ def subdigit_repeats(
         .filter((ndigits % cols[0]) == 0)
         .select(with_inverted_ne)
     )
-    initial_df = pl.concat([initial_df, new_df])
-
+    initial_df = pl.concat((initial_df, new_df))
+    print(initial_df.explain())
     if minv:
         initial_df = initial_df.with_columns(minv_col.cast(minv_dtype))
 
