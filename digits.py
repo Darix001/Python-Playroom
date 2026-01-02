@@ -19,8 +19,7 @@ def subdigit_repeats(
     minv: bool = False,
     minv_dtype: type | pl.DataType | pl.DataTypeExpr = pl.UInt64,
 ) -> pl.LazyFrame:
-    """Return a DataFrame with subdigit repeats for a given number of digits.
-
+    """
     Parameters:
         ndigits (int): The number of digits to generate subdigit repeats for.
         dtype (type | pl.DataType | pl.DataTypeExpr): main dtype of the dataframe
@@ -28,7 +27,8 @@ def subdigit_repeats(
         minv_dtype (type | pl.DataType | pl.DataTypeExpr): The data type to use for the minv column.
 
     Returns:
-        pl.DataFrame: A DataFrame with subdigit repeats for the given number of digits.
+        pl.LazyFrame: Return a LazyFrame with subdigit repeats for a given number of digits.
+        A LazyFrame is returned for convenience.
 
     Example:
         >>> subdigit_repeats(4).collect()
@@ -84,7 +84,8 @@ def digit_range(ndigits: int, /) -> range:
 
 
 def ndigits(n: int) -> int:
-    assert n > 0
+    if n < 0:
+        raise ValueError("n must be non-negative")
     i = math.trunc(0.30102999566398114 * (n.bit_length() - 1)) + 1
     return (10**i <= n) + i
 
