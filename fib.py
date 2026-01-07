@@ -6,8 +6,6 @@ from functools import partial
 from math import trunc
 from operator import attrgetter
 
-import polars as pl
-
 fib_deque = partial(deque, (0, 1), maxlen=2)
 
 SQRT5 = Decimal(5).sqrt()
