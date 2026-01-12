@@ -63,6 +63,9 @@ class Fib:
         )
 
     def to_list(self, /) -> list[int]:
-        seq = [0]
-        seq.extend(it.islice(it.accumulate(seq, initial=1), self.indexes[-1]))
-        return seq
+        if indexes := self.indexes:
+            seq = [0]
+            seq.extend(it.islice(it.accumulate(seq, initial=1), indexes[-1]))
+            return seq
+        else:
+            return []
