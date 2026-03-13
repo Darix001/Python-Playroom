@@ -1,58 +1,47 @@
 import builtins
-import dataclasses as dt
 import functools as ft
 import itertools as it
 import operator as op
 import types
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
+
+import attrs
 
 modules = [builtins, it, op]
 
 
-@dt.dataclass
+@attrs.frozen
 class JIterator:
-    iterator: Iterator[Any]
-    __slots__ = "iterator"
-    iterator = dt.field()
-
-    def __init__(self, iterable: Iterable, /):
-        self.iterator = iter(iterable)
+    iterator: Iterator[Any] = attrs.field(converter=iter)
 
     def __iter__(self, /):
         return self.iterator
 
     def __getattr__(self, attr: str, /):
-        return types.MethodType(self.dummy_method, attr)
+        return types.MethodType(self.register_method(attr), self)
 
-    def dummy_method(self, method_name, /, *args):
+    @classmethod
+    def register_method(cls, func_name: str, /):
         if not (
-            fn := next(
-                filter(None, map(getattr, modules, it.repeat(method_name))), None
-            )
+            fn := next(filter(None, map(getattr, modules, it.repeat(func_name))), None)
         ):
-            raise AttributeError("Function Name not found: " + method_name)
+            raise ValueError("Function Name not found: " + func_name)
 
-        if not args:
-
-            def method(self, /):
-                fn(self.iterator)
-
-        elif all(map(callable, args)):
+        if func_name.startswith("filter") or func_name.endswith(("map", "while")):
 
             def method(self, /, *args: Callable):
                 iterator = self.iterator
                 for arg in args:
                     iterator = fn(arg, iterator)
-                self.iterator = Iterator
+                return type(self)(iterator)
         else:
-            return NotImplemented
 
-        setattr(type(self), method_name, method)
-        return method(self, *args)
+            def method(self, /, *args, **kw):
+                return fn(self.iterator, *args, **kw)
+
+        setattr(cls, func_name, method)
+        return method
 
     def reduce(self, func, /, *, initial):
         return ft.reduce(func, self.iterator, initial)
-
-
-breakpoint()
