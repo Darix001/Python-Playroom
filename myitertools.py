@@ -6,7 +6,7 @@ import itertools as it
 import operator as op
 from collections.abc import Callable, Iterable, Iterator
 from types import MethodType, ModuleType
-from typing import Any, Type, TypeVar
+from typing import Any, Type, TypeVar, Generic
 
 import attrs
 
@@ -18,18 +18,25 @@ ifuncs = ModuleType(
 
 modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it, op))]
 
-T = TypeVar("T", bound="Iter")
-
+T = TypeVar("T")
+R = TypeVar("R")
+V = TypeVar("V")
 
 @attrs.frozen
-class Iter:
-    iterator: Iterator[Any] = attrs.field(converter=iter)
+class Iter(Generic[T]):
+    iterator: Iterable[T]
 
     def __iter__(self, /) -> Iterator:
-        return self.iterator
+        return iter(self.iterator)
 
     def __getattr__(self, attr: str, /) -> Callable[..., Iter]:
         return MethodType(self.register_method(attr), self)
+
+    def scalar(self, func: Callable[[Iterable[T]], R]) -> R:
+        return func(self.iterator)
+
+    def reduce(self, func:Callable[[Any, Any], V], /, *initial) -> V:
+        return ft.reduce(func, self.iterator, *initial) if initial else ft.reduce(func, self.iterator)
 
     @classmethod
     def register_method(cls: Type[T], fn_name: str, /) -> Callable[[...], Iter]:
@@ -59,11 +66,6 @@ class Iter:
         setattr(cls, fn_name, method)
         return method
 
-    def scalar(self, func: Callable[[Iterable], Any]) -> Any:
-        return func(self.iterator)
-
-    def reduce(self, func, /, *, initial) -> Any:
-        return ft.reduce(func, self.iterator, initial)
-
-
-a = Iter("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(str.isalpha, str.islower)
+a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(str.isalpha, str.islower)
+valids = a.scalar(",".join)
+a.iterator
