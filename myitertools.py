@@ -6,7 +6,7 @@ import itertools as it
 import operator as op
 from collections.abc import Callable, Iterable, Iterator
 from types import MethodType, ModuleType
-from typing import Any, Generic, Type, TypeVar
+from typing import Any, Type, TypeVar
 
 import attrs
 
@@ -89,6 +89,8 @@ class IterPipe(BaseIter):
         return self.gen()
 
 
-a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(str.isalpha, str.islower)
-print(a.scalar(",".join))
-print(a.scalar)
+if __name__ == "__main__":
+    a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(
+        str.isascii, str.islower, str.isalpha
+    )
+    print(a.scalar(",".join), a)
