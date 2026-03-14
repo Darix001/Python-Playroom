@@ -70,7 +70,7 @@ class BaseIter(Iterable):
 
 
 @attrs.define
-class IWrap(BaseIter):
+class Iter(BaseIter):
     iterable: Iterable[T]
 
     def __iter__(self, /) -> Iterator:
@@ -89,5 +89,6 @@ class IterPipe(BaseIter):
         return self.gen()
 
 
-a = IWrap[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(str.isalpha, str.islower)
+a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(str.isalpha, str.islower)
 print(a.scalar(",".join))
+print(a.scalar)
