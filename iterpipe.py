@@ -23,19 +23,14 @@ R = TypeVar("R")
 V = TypeVar("V")
 
 
-class ipartial(ft.partial):
-    __slots__ = ()
-    __iter__ = ft.partial.__call__
-
-
 class BaseIter(Iterable):
     __slots__ = ()
 
     def __getattr__(self, attr: str, /) -> Callable[..., Iter]:
         return MethodType(self.register_method(attr), self)
 
-    def flatten(self, /) -> IterPipe:
-        return IterPipe(ipartial(it.chain.from_iterable, self.gen))
+    def flatten(self, /) -> ipartial:
+        return ipartial(it.chain.from_iterable, self)
 
     def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
@@ -44,7 +39,7 @@ class BaseIter(Iterable):
         return func(self)
 
     @classmethod
-    def register_method(cls: Type[T], fn_name: str, /) -> Callable[[...], Iter]:
+    def register_method(cls: Type[T], fn_name: str, /) -> Callable[[...], ipartial]:
         if not (
             fn := next(
                 filter(None, map(op.methodcaller("get", fn_name), modules)), None
@@ -54,22 +49,23 @@ class BaseIter(Iterable):
 
         if fn_name.startswith("filter") or fn_name.endswith(("map", "while")):
 
-            def method(self, /, *args: Callable) -> cls:
-                iterator = self.gen
+            def method(self, /, *args: Callable) -> ipartial:
+                iterator = self
                 for arg in args:
                     iterator = ipartial(fn, arg, iterator)
-                return IterPipe(iterator)
+                return iterator
         else:
-            if not hasattr(fn, "__get__"):
 
-                def method(self, *args, **kw) -> cls:
-                    return IterPipe(ipartial(fn, self.gen, *args, **kw))
-
-            else:
-                method = fn
+            def method(self, /, *args, **kw) -> ipartial:
+                return ipartial(fn, self, *args, **kw)
 
         setattr(cls, fn_name, method)
         return method
+
+
+class ipartial(ft.partial, BaseIter):
+    __slots__ = ()
+    __iter__ = ft.partial.__call__
 
 
 @attrs.define
@@ -79,25 +75,11 @@ class Iter(BaseIter):
     def __iter__(self, /) -> Iterator:
         return iter(self.iterable)
 
-    @property
-    def gen(self, /):
-        return self
-
-
-@attrs.define
-class IterPipe(BaseIter):
-    gen: ipartial
-
-    @classmethod
-    def fromfunc(cls, /, fn, *args, **kwargs):
-        return cls(ipartial(fn, *args, **kwargs))
-
-    def __iter__(self, /) -> Iterator:
-        return self.gen()
-
 
 if __name__ == "__main__":
     a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(
-        str.isascii, str.islower, str.isalpha
+        str.isalpha,
+        str.islower,
+        str.isascii,
     )
     print(a.scalar(",".join), a)
