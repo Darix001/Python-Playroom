@@ -34,11 +34,14 @@ class BaseIter(Iterable):
     def __getattr__(self, attr: str, /) -> Callable[..., Iter]:
         return MethodType(self.register_method(attr), self)
 
-    def scalar(self, func: Callable[[Iterable[T]], R]) -> R:
-        return func(self)
+    def flatten(self, /) -> IterPipe:
+        return IterPipe(ipartial(it.chain.from_iterable, self.gen))
 
     def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
+
+    def scalar(self, func: Callable[[Iterable[T]], R]) -> R:
+        return func(self)
 
     @classmethod
     def register_method(cls: Type[T], fn_name: str, /) -> Callable[[...], Iter]:
@@ -71,7 +74,7 @@ class BaseIter(Iterable):
 
 @attrs.define
 class Iter(BaseIter):
-    iterable: Iterable[T]
+    iterable: Iterable[T] = ()
 
     def __iter__(self, /) -> Iterator:
         return iter(self.iterable)
@@ -84,6 +87,10 @@ class Iter(BaseIter):
 @attrs.define
 class IterPipe(BaseIter):
     gen: ipartial
+
+    @classmethod
+    def fromfunc(cls, /, fn, *args, **kwargs):
+        return cls(ipartial(fn, *args, **kwargs))
 
     def __iter__(self, /) -> Iterator:
         return self.gen()
