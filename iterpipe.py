@@ -26,7 +26,7 @@ V = TypeVar("V")
 class BaseIter(Iterable):
     __slots__ = ()
 
-    def __getattr__(self, attr: str, /) -> Callable[..., Iter]:
+    def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
         return MethodType(self.register_method(attr), self)
 
     def flatten(self, /) -> ipartial:
