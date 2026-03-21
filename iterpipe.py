@@ -19,7 +19,7 @@ modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it, op))]
 
 R = TypeVar("R")
 V = TypeVar("V")
-S = TypeVar("S")
+C = TypeVar("C")
 
 
 class BaseIter(Iterable):
@@ -38,7 +38,7 @@ class BaseIter(Iterable):
         return func(self)
 
     @classmethod
-    def register_method(cls: Type[S], fn_name: str, /) -> Callable[[...], ipartial]:
+    def register_method(cls: Type[C], fn_name: str, /) -> Callable[[...], ipartial]:
         if not (
             fn := next(
                 filter(None, map(op.methodcaller("get", fn_name), modules)), None
