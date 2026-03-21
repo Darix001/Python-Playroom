@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import builtins
+import dataclasses as dt
 import functools as ft
 import itertools as it
 import operator as op
-import dataclasses as dt
 from collections.abc import Callable, Iterable, Iterator
 from types import MethodType, ModuleType
 from typing import Any, Type, TypeVar
-
 
 ifuncs = ModuleType(
     "ifuncs",
@@ -18,7 +17,6 @@ ifuncs = ModuleType(
 
 modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it, op))]
 
-T = TypeVar("T")
 R = TypeVar("R")
 V = TypeVar("V")
 S = TypeVar("S")
@@ -36,7 +34,7 @@ class BaseIter(Iterable):
     def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
 
-    def scalar(self, func: Callable[[Iterable[T]], R]) -> R:
+    def scalar(self, func: Callable[[Iterable], R]) -> R:
         return func(self)
 
     @classmethod
@@ -71,7 +69,7 @@ class ipartial(ft.partial, BaseIter):
 
 @dt.dataclass(slots=True)
 class Iter(BaseIter):
-    iterable: Iterable[T] = ()
+    iterable: Iterable = ()
 
     def __iter__(self, /) -> Iterator:
         return iter(self.iterable)
@@ -79,8 +77,8 @@ class Iter(BaseIter):
 
 if __name__ == "__main__":
     a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(
-        str.isalpha,
         str.islower,
         str.isascii,
+        str.isalpha,
     )
     print(a.scalar(",".join), a)
