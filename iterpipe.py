@@ -4,11 +4,11 @@ import builtins
 import functools as ft
 import itertools as it
 import operator as op
+import dataclasses as dt
 from collections.abc import Callable, Iterable, Iterator
 from types import MethodType, ModuleType
 from typing import Any, Type, TypeVar
 
-import attrs
 
 ifuncs = ModuleType(
     "ifuncs",
@@ -21,6 +21,7 @@ modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it, op))]
 T = TypeVar("T")
 R = TypeVar("R")
 V = TypeVar("V")
+S = TypeVar("S")
 
 
 class BaseIter(Iterable):
@@ -39,7 +40,7 @@ class BaseIter(Iterable):
         return func(self)
 
     @classmethod
-    def register_method(cls: Type[T], fn_name: str, /) -> Callable[[...], ipartial]:
+    def register_method(cls: Type[S], fn_name: str, /) -> Callable[[...], ipartial]:
         if not (
             fn := next(
                 filter(None, map(op.methodcaller("get", fn_name), modules)), None
@@ -51,7 +52,7 @@ class BaseIter(Iterable):
 
             def method(self, /, *args: Callable) -> ipartial:
                 iterator = self
-                for arg in args:
+                for arg in reversed(args):
                     iterator = ipartial(fn, arg, iterator)
                 return iterator
         else:
@@ -68,7 +69,7 @@ class ipartial(ft.partial, BaseIter):
     __iter__ = ft.partial.__call__
 
 
-@attrs.define
+@dt.dataclass(slots=True)
 class Iter(BaseIter):
     iterable: Iterable[T] = ()
 
