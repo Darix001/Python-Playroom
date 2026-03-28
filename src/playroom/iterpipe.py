@@ -15,7 +15,12 @@ ifuncs = ModuleType(
     "classmethod of Iter class. the register_method is called by __getattr__.",
 )
 
-modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it, op))]
+modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it))]
+
+
+def add_lookup_module(module: ModuleType) -> None:
+    modules.append(vars(module))
+
 
 R = TypeVar("R")
 V = TypeVar("V")
@@ -77,8 +82,8 @@ class Iter(BaseIter):
 
 if __name__ == "__main__":
     a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").filter(
+        str.isalpha,
         str.islower,
         str.isascii,
-        str.isalpha,
     )
     print(a.scalar(",".join), a)
