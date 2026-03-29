@@ -22,6 +22,32 @@ def add_lookup_module(module: ModuleType) -> None:
     modules.append(vars(module))
 
 
+def search_func(function_name: str, /, default: Any = None):
+    return next(
+        filter(None, map(op.methodcaller("get", function_name), modules)), default
+    )
+
+
+T_composed = TypeVar("T_composed")
+
+
+def composed_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
+    left, sep, function_name = method_name.partition("composed_")
+    if not left and sep and (pipe_func := search_func(function_name)):
+
+        def method(
+            iterable, *args: T_composed, key: Callable[[T_composed], Any] | None = None
+        ) -> ipartial:
+            funcs = reversed(args)
+            if key is not None:
+                funcs = map(key, args)
+            for func in funcs:
+                iterable = ipartial(pipe_func, func, iterable)
+            return iterable
+
+
+factories = {"composed": composed_pipe}
+
 R = TypeVar("R")
 V = TypeVar("V")
 C = TypeVar("C")
@@ -43,27 +69,27 @@ class BaseIter(Iterable):
         return func(self)
 
     @classmethod
-    def register_method(cls: Type[C], fn_name: str, /) -> Callable[[...], ipartial]:
+    def register_method(cls: Type[C], method_name: str, /) -> Callable[[...], ipartial]:
         if not (
             fn := next(
-                filter(None, map(op.methodcaller("get", fn_name), modules)), None
+                filter(None, map(op.methodcaller("get", method_name), modules)), None
             )
         ):
-            raise ValueError("Function Name not found: " + fn_name)
+            raise ValueError("Function Name not found: " + method_name)
 
-        if fn_name.startswith("filter") or fn_name.endswith(("map", "while")):
-
-            def method(self, /, *args: Callable) -> ipartial:
-                iterator = self
-                for arg in reversed(args):
-                    iterator = ipartial(fn, arg, iterator)
-                return iterator
-        else:
+        if not (
+            method := next(
+                map(
+                    op.methodcaller("__call__", method_name),
+                    factories.values(),
+                )
+            )
+        ):
 
             def method(self, /, *args, **kw) -> ipartial:
                 return ipartial(fn, self, *args, **kw)
 
-        setattr(cls, fn_name, method)
+        setattr(cls, method_name, method)
         return method
 
 
