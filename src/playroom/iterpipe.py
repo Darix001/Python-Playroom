@@ -25,10 +25,13 @@ def add_lookup_module(module: ModuleType) -> None:
     modules.append(vars(module))
 
 
-def search_func(function_name: str, /, default: Any = None):
-    return next(
-        filter(None, map(op.methodcaller("get", function_name), modules)), default
-    )
+def search_func(function_name: str, /):
+    if func := next(
+        filter(None, map(op.methodcaller("get", function_name), modules)), None
+    ):
+        return func
+    else:
+        raise ValueError("No such function found with name: " + function_name)
 
 
 T_composed = TypeVar("T_composed")
@@ -41,7 +44,10 @@ class BaseIter(Iterable):
     __slots__ = ()
 
     def __getattr__(self, attr: str, /) -> Callable[..., ipartial] | None:
-        return MethodType(self.register_method(attr), self)
+        try:
+            return MethodType(self.register_method(attr), self)
+        except ValueError as e:
+            raise AttributeError from e
 
     def flatten(self, /) -> ipartial:
         return ipartial(it.chain.from_iterable, self)
@@ -53,26 +59,19 @@ class BaseIter(Iterable):
         return func(self)
 
     @classmethod
-    def register_method(
-        cls: Type[C], method_name: str, /
-    ) -> Callable[[...], ipartial] | None:
+    def register_method(cls: Type[C], method_name: str, /) -> Callable[[...], ipartial]:
         for key, factory in factories.items():
             if match := key.match(method_name):
                 method = factory(match)
                 break
         else:
-            if fn := search_func(method_name):
+            fn = search_func(method_name)
 
-                def method(self, /, *args, **kw) -> ipartial:
-                    return ipartial(fn, self, *args, **kw)
+            def method(self, /, *args, **kw) -> ipartial:
+                return ipartial(fn, self, *args, **kw)
 
-        if method:
-            setattr(BaseIter, method_name, method)
-            return method
-        else:
-            raise AttributeError(
-                "Couldn't create a method for the attribute name: " + method_name
-            )
+        setattr(BaseIter, method_name, method)
+        return method
 
 
 class ipartial(partial, BaseIter):
@@ -88,7 +87,7 @@ class Iter(BaseIter):
         return iter(self.iterable)
 
 
-imethod_type = Callable[..., ipartial] | None
+imethod_type = Callable[..., ipartial]
 factory_type = Callable[[re.Match[str]], imethod_type]
 
 
@@ -120,6 +119,9 @@ def composed_pipe(match: re.Match[str], /) -> imethod_type:
             return iterable
 
         return method
+
+    else:
+        raise
 
 
 factories: dict[re.Pattern[str], factory_type]
