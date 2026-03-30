@@ -93,9 +93,9 @@ factory_type = Callable[[re.Match[str]], imethod_type]
 
 def imethod_factory(func: factory_type | str, /):
     return (
-        partial(register_imethod_factory, expr=func)
-        if isinstance(func, str)
-        else register_imethod_factory(func, func.__name__)
+        register_imethod_factory(func, func.__name__)
+        if callable(func)
+        else partial(register_imethod_factory, expr=func)
     )
 
 
