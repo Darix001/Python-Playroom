@@ -43,7 +43,7 @@ C = TypeVar("C")
 class BaseIter(Iterable):
     __slots__ = ()
 
-    def __getattr__(self, attr: str, /) -> Callable[..., ipartial] | None:
+    def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
         try:
             return MethodType(self.register_method(attr), self)
         except ValueError as e:
