@@ -125,6 +125,7 @@ class BaseIter(Iterable):
                     return ipartial(fn, self, *args, **kw)
             else:
 
+                @ft.wraps(fn)
                 def method(self, /, *args, **kw) -> ipartial:
                     return ipartial(
                         fn, self, *(args[index:] + (self,) + args[:index]), **kw
@@ -185,11 +186,24 @@ def composed_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
     return method
 
 
+@imethod_factory("(item|attr|method)_?")
+def item_attr_method_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
+    kind = match.group(1)
+    map_func = PipeExpr.funcs[getattr(constants, kind.upper())]
+    pipe_func = search_func(match.string[match.end() :])
+
+    def method(iterable, /, value: Any) -> ipartial:
+        return ipartial(pipe_func, map_func(value), iterable)
+
+    return method
+
+
 if __name__ == "__main__":
     a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").composed_filter(
         str.isalpha,
         str.islower,
         str.isascii,
     )
-    print(a)
-    print(a.scalar(",".join))
+    print(",".join(a))
+    d = Iter(zip(range(10))).item_map(0)
+    print(bytes(d))
