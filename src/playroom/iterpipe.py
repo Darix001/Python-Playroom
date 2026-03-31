@@ -18,7 +18,7 @@ ifuncs = ModuleType(
 
 modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it))]
 
-factories = {}
+factories: dict[re.Pattern[str], factory_type] = {}
 
 
 def add_lookup_module(module: ModuleType) -> None:
@@ -110,6 +110,7 @@ class BaseIter(Iterable):
         for regexp, fn in factories.items():
             if match := regexp.match(method_name):
                 method = fn(match)
+                break
         else:
 
             def method(self, /, *args, **kw) -> ipartial:
@@ -160,7 +161,6 @@ def composed_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
     def method(
         iterable, *args: T_composed, key: Callable[[T_composed], Any] | None = None
     ) -> ipartial:
-        print(89)
         funcs = reversed(args)
         if key is not None:
             funcs = map(key, args)
