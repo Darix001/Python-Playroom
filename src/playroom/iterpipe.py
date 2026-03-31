@@ -7,6 +7,7 @@ import itertools as it
 import operator as op
 import re
 from collections.abc import Callable, Iterable, Iterator
+from inspect import signature
 from types import MethodType, ModuleType, SimpleNamespace
 from typing import Any, Self, SupportsIndex, Type, TypeVar
 
@@ -112,9 +113,22 @@ class BaseIter(Iterable):
                 method = fn(match)
                 break
         else:
+            sig = signature(fn)
+            index = 0
+            try:
+                index = op.indexOf(sig.parameters.keys(), "iterable")
+            except ValueError:
+                pass
+            if not index:
 
-            def method(self, /, *args, **kw) -> ipartial:
-                return ipartial(fn, self, *args, **kw)
+                def method(self, /, *args, **kw) -> ipartial:
+                    return ipartial(fn, self, *args, **kw)
+            else:
+
+                def method(self, /, *args, **kw) -> ipartial:
+                    return ipartial(
+                        fn, self, *(args[index:] + (self,) + args[:index]), **kw
+                    )
 
         setattr(cls, method_name, method)
         return method
