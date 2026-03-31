@@ -17,6 +17,7 @@ ifuncs = ModuleType(
 
 modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it))]
 
+factories = {}
 
 def add_lookup_module(module: ModuleType) -> None:
     modules.append(vars(module))
@@ -30,7 +31,20 @@ def search_func(function_name: str, /, default: Any = None):
 
 T_composed = TypeVar("T_composed")
 
+def imethod_factory(func: factory_type | str, /):
+    return (
+        register_imethod_factory(func, func.__name__)
+        if callable(func)
+        else partial(register_imethod_factory, expr=func)
+    )
 
+
+def register_imethod_factory(func: factory_type, expr: str) -> factory_type:
+    factories[re.compile(expr)] = func
+    return func
+
+
+@imethod_factory("composed_?")
 def composed_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
     left, sep, function_name = method_name.partition("composed_")
     if not left and sep and (pipe_func := search_func(function_name)):
@@ -45,8 +59,6 @@ def composed_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
                 iterable = ipartial(pipe_func, func, iterable)
             return iterable
 
-
-factories = {"composed": composed_pipe}
 
 R = TypeVar("R")
 V = TypeVar("V")
