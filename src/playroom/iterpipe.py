@@ -5,11 +5,12 @@ import dataclasses as dt
 import functools as ft
 import itertools as it
 import operator as op
-import re
 from collections.abc import Callable, Iterable, Iterator
 from inspect import signature
 from types import MethodType, ModuleType, SimpleNamespace
 from typing import Any, Self, SupportsIndex, Type, TypeVar
+
+import more_itertools as mit
 
 from .methodtools import add_method
 
@@ -19,9 +20,9 @@ ifuncs = ModuleType(
     "classmethod of Iter class. the register_method is called by __getattr__.",
 )
 
-modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it))]
+modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it, mit))]
 
-factories: dict[re.Pattern[str], factory_type] = {}
+factories: dict[checker_type, factory_type] = {}
 
 
 def add_lookup_module(module: ModuleType) -> None:
@@ -29,7 +30,7 @@ def add_lookup_module(module: ModuleType) -> None:
 
 
 def search_func(function_name: str, /):
-    func = next(filter(None, map(op.methodcaller("get", function_name), modules)), None)
+    func = mit.first_true(modules, None, op.methodcaller("get", function_name))
     if func is None:
         raise ValueError("Function Name not found: " + function_name)
     return func
@@ -110,10 +111,10 @@ class BaseIter(Iterable):
 
     @classmethod
     def register_method(cls: Type[C], method_name: str, /) -> Callable[[...], ipartial]:
-        for regexp, fn in factories.items():
-            if match := regexp.match(method_name):
-                method = fn(match)
-                break
+        if check_func := mit.first_true(
+            factories, None, op.methodcaller("__call__", method_name)
+        ):
+            method = factories[check_func](method_name)
         else:
             parameters = signature(fn := search_func(method_name)).parameters
             if not (iterable_param := parameters.get("iterable")):
@@ -176,25 +177,23 @@ class MutableIter(BaseIter):
 
 MutIter = MutableIter
 
-factory_type = Callable[[re.Match[str]], Callable[..., ipartial]]
+factory_type = Callable[[str], Callable[..., ipartial]]
+checker_type = Callable[[str], bool | Any]
 
 
-def imethod_factory(func, /):
-    return (
-        register_imethod_factory(func, func.__name__)
-        if callable(func)
-        else ft.partial(register_imethod_factory, expr=func)
-    )
-
-
-def register_imethod_factory(func: factory_type, expr: str) -> factory_type:
-    factories[re.compile(expr)] = func
+def register_imethod_factory(checker: checker_type, func: factory_type) -> factory_type:
+    factories[checker] = func
     return func
 
 
-@imethod_factory("composed_?")
-def composed_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
-    pipe_func = search_func(match.string[match.end() :])
+imethod_factory = ft.partial(ft.partial, register_imethod_factory)
+
+startswith = ft.partial(op.methodcaller, "startswith")
+
+
+@imethod_factory(startswith("composed"))
+def composed_pipe(mathod_name: str, /) -> Callable[..., ipartial]:
+    pipe_func = search_func(mathod_name[8:].lstrip("_"))
 
     def method(
         iterable, *args: T_composed, key: Callable[[T_composed], Any] | None = None
@@ -209,11 +208,23 @@ def composed_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
     return method
 
 
-@imethod_factory("(item|attr|method)_?")
-def item_attr_method_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
-    kind = match.group(1)
+@imethod_factory(
+    startswith(
+        (
+            "item",
+            "attr",
+            "method",
+        )
+    )
+)
+def property_pipe(method_name: str, /) -> Callable[..., ipartial]:
+    index = 4
+    kind = method_name[:index]
+    if kind.endswith("o"):
+        kind += "d"
+        index += 1
     map_func = PipeExpr.funcs[getattr(constants, kind.upper())]
-    pipe_func = search_func(match.string[match.end() :])
+    pipe_func = search_func(method_name[index:].lstrip("_"))
 
     def method(iterable, /, *args, **kw) -> ipartial:
         return ipartial(pipe_func, map_func(*args, **kw), iterable)

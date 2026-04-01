@@ -12,4 +12,6 @@ dependencies = [
     "pyarrow>=23.0.0",
     "pyperclip>=1.11.0",
     "pytest>=9.0.2",
+    "tools>=1.0.26",
+    "ty>=0.0.27",
 ]
