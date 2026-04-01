@@ -11,6 +11,8 @@ from inspect import signature
 from types import MethodType, ModuleType, SimpleNamespace
 from typing import Any, Self, SupportsIndex, Type, TypeVar
 
+from .methodtools import add_method
+
 ifuncs = ModuleType(
     "ifuncs",
     doc="This is the first module that is looked up by the register_method "
@@ -113,25 +115,41 @@ class BaseIter(Iterable):
                 method = fn(match)
                 break
         else:
-            sig = signature(fn)
-            index = 0
-            try:
-                index = op.indexOf(sig.parameters.keys(), "iterable")
-            except ValueError:
-                pass
-            if not index:
+            parameters = signature(fn := search_func(method_name)).parameters
+            if not (iterable_param := parameters.get("iterable")):
+                raise ValueError(
+                    "No 'iterable' parameter found in function signature for function "
+                    + method_name
+                )
+            if iterable_param.kind == iterable_param.POSITIONAL_ONLY:
+                index = 0
+                try:
+                    index = op.indexOf(param_names := parameters.keys(), "iterable")
+                except ValueError:
+                    pass
+                if not index:
 
-                def method(self, /, *args, **kw) -> ipartial:
-                    return ipartial(fn, self, *args, **kw)
+                    def method(self, /, *args, **kw) -> ipartial:
+                        return ipartial(fn, self, *args, **kw)
+
+                elif index == len(param_names) - 1:
+
+                    def method(self, /, *args, **kw) -> ipartial:
+                        return ipartial(fn, *args, self, **kw)
+                else:
+
+                    def method(self, /, *args, **kw) -> ipartial:
+                        return ipartial(
+                            fn, self, *(args[index:] + (self,) + args[:index]), **kw
+                        )
             else:
 
-                @ft.wraps(fn)
                 def method(self, /, *args, **kw) -> ipartial:
-                    return ipartial(
-                        fn, self, *(args[index:] + (self,) + args[:index]), **kw
-                    )
+                    return ipartial(fn, *args, **kw, iterable=self)
 
-        setattr(cls, method_name, method)
+            method.__name__ = fn.__name__
+
+        add_method(cls, method)
         return method
 
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
@@ -145,13 +163,18 @@ class ipartial(ft.partial, BaseIter):
     __iter__ = ft.partial.__call__
 
 
+Iter = ft.partial(ipartial, iter)
+
+
 @dt.dataclass(slots=True)
-class Iter(BaseIter):
+class MutableIter(BaseIter):
     iterable: Iterable = ()
 
     def __iter__(self, /) -> Iterator:
         return iter(self.iterable)
 
+
+MutIter = MutableIter
 
 factory_type = Callable[[re.Match[str]], Callable[..., ipartial]]
 
@@ -199,11 +222,11 @@ def item_attr_method_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
 
 
 if __name__ == "__main__":
-    a = Iter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").composed_filter(
+    a = MutableIter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").composed_filter(
         str.isalpha,
         str.islower,
         str.isascii,
     )
     print(",".join(a))
-    d = Iter(zip(range(10))).item_map(0)
+    d = MutableIter(zip(range(10))).item_map(0)
     print(bytes(d))
