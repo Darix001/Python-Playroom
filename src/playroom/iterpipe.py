@@ -192,8 +192,8 @@ def item_attr_method_pipe(match: re.Match[str], /) -> Callable[..., ipartial]:
     map_func = PipeExpr.funcs[getattr(constants, kind.upper())]
     pipe_func = search_func(match.string[match.end() :])
 
-    def method(iterable, /, value: Any) -> ipartial:
-        return ipartial(pipe_func, map_func(value), iterable)
+    def method(iterable, /, *args, **kw) -> ipartial:
+        return ipartial(pipe_func, map_func(*args, **kw), iterable)
 
     return method
 
