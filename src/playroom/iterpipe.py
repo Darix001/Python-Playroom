@@ -5,9 +5,9 @@ import dataclasses as dt
 import functools as ft
 import itertools as it
 import operator as op
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from inspect import signature
-from types import MethodType, ModuleType, SimpleNamespace
+from types import MethodType, ModuleType
 from typing import Any, Self, SupportsIndex, Type, TypeVar
 
 import more_itertools as mit
@@ -20,9 +20,9 @@ ifuncs = ModuleType(
     "classmethod of Iter class. the register_method is called by __getattr__.",
 )
 
-modules: list[dict[str, Callable]] = [*map(vars, (ifuncs, builtins, it, mit))]
+modules: list[Mapping[str, Callable]] = [*map(vars, (ifuncs, builtins, it, mit))]
 
-factories: dict[checker_type, factory_type] = {}
+factories: dict[str, factory_type] = {}
 
 
 def add_lookup_module(module: ModuleType) -> None:
@@ -43,52 +43,50 @@ R = TypeVar("R")
 V = TypeVar("V")
 C = TypeVar("C")
 
-constants: SimpleNamespace[str, int] = SimpleNamespace()
-for i, const_attr in enumerate(("ATTR", "ITEM", "METHOD")):
-    setattr(constants, const_attr, i)
+
+list_field = ft.partial(dt.field, default_factory=list)
+
+
+class next_func_caller(map):
+    __slots__ = ()
+    __call__ = property(next)
 
 
 @dt.dataclass(slots=True, frozen=True)
 class PipeExpr:
-    pipe: list[
-        tuple[str | Any]
-        | tuple[str, tuple, dict[str, Any]]
-        | tuple[tuple, dict[str, Any]]
-    ] = dt.field(default_factory=[].copy)
-    func_ids: bytearray = dt.field(default_factory=bytearray().copy)
-    funcs = (op.attrgetter, op.itemgetter, op.methodcaller)
+    args_list: list[tuple[Any, ...]] = list_field()
+    funcs: list[Callable[..., Callable]] = list_field()
 
     def __getattr__(self, attr: str, /) -> Self:
         if last_attr := self.last_attr():
-            self.pipe[-1] = (f"{last_attr}.{attr}",)
+            self.args_list[-1] = (f"{last_attr}.{attr}",)
         else:
-            self.add(constants.ATTR, (attr,))
+            self.add(op.attrgetter, attr)
         return self
 
-    def __call__(self, *args, **kw) -> Self:
-        if last_attr := self.last_attr():
-            self.func_ids[-1] = constants.METHOD
-            self.pipe[-1] = (last_attr + ".__call__", args, kw)
+    def __call__(self, *args) -> Self:
+        if attr := self.last_attr():
+            left, _, attr = attr.rpartition(".")
+            self.args_list[-1] = (left,)
         else:
-            self.add(constants.METHOD, ("__call__", args, kw))
-
-        self.pipe[-1] = (last_attr, args, kw)
+            attr = "__call__"
+        self.add(op.methodcaller, attr, *args)
         return self
 
     def __getitem__(self, /, item) -> Self:
-        self.add(constants.ITEM, (item,))
+        self.add(op.itemgetter, item)
         return self
 
-    def add(self, /, func_id: int, obj: tuple):
-        self.pipe.append(obj)
-        self.func_ids.append(func_id)
+    def add(self, /, func: Callable, *args):
+        self.args_list.append(args)
+        self.funcs.append(func)
 
     def last_attr(self, /):
-        if (funcs := self.func_ids) and not funcs[-1]:
-            return self.pipe[-1][-1]
+        if (funcs := self.funcs) and funcs[-1] is op.attrgetter:
+            return self.args_list[-1][-1]
 
     def copy(self, /) -> Self | PipeExpr:
-        return type(self)(self.pipe.copy(), self.func_ids.copy())
+        return type(self)(self.args_list.copy(), self.funcs.copy())
 
 
 class BaseIter(Iterable):
@@ -96,6 +94,9 @@ class BaseIter(Iterable):
 
     def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
         return MethodType(self.register_method(attr), self)
+
+    def starmap_funcs(funcs, args):
+        return it.starmap(next_func_caller(op.call, funcs), args)
 
     def flatten(self, /) -> ipartial:
         return ipartial(it.chain.from_iterable, self)
@@ -110,12 +111,11 @@ class BaseIter(Iterable):
         return ipartial(map, it.repeat, iterable, it.repeat(times)).flatten()
 
     @classmethod
-    def register_method(cls: Type[C], method_name: str, /) -> Callable[[...], ipartial]:
-        if check_func := mit.first_true(
-            factories, None, op.methodcaller("__call__", method_name)
-        ):
-            method = factories[check_func](method_name)
-        else:
+    def register_method(cls: Type[C], method_name: str, /) -> Callable[..., ipartial]:
+        method = mit.first_true(
+            map(op.methodcaller("__call__", method_name), factories.values()), None
+        )
+        if not method:
             parameters = signature(fn := search_func(method_name)).parameters
             if not (iterable_param := parameters.get("iterable")):
                 raise ValueError(
@@ -154,7 +154,8 @@ class BaseIter(Iterable):
         return method
 
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
-        for func in map(ft.partial(op.getitem, pipe.funcs), pipe.func_ids):
+        funcs = it.starmap(next_func_caller(op.call, pipe.funcs), pipe.args_list)
+        for func in funcs:
             iterable = ipartial(map, func, iterable)
         return iterable
 
@@ -177,23 +178,26 @@ class MutableIter(BaseIter):
 
 MutIter = MutableIter
 
-factory_type = Callable[[str], Callable[..., ipartial]]
-checker_type = Callable[[str], bool | Any]
+factory_type = Callable[[str], Callable[..., ipartial] | None]
 
 
-def register_imethod_factory(checker: checker_type, func: factory_type) -> factory_type:
-    factories[checker] = func
+def register_imethod_factory(name: str, func: factory_type) -> factory_type:
+    factories[name] = func
     return func
 
 
-imethod_factory = ft.partial(ft.partial, register_imethod_factory)
+def imethod_factory(func: factory_type | str):
+    if callable(func):
+        return register_imethod_factory(func.__name__, func)
+    else:
+        return ft.partial(register_imethod_factory, func)
 
-startswith = ft.partial(op.methodcaller, "startswith")
 
-
-@imethod_factory(startswith("composed"))
-def composed_pipe(mathod_name: str, /) -> Callable[..., ipartial]:
-    pipe_func = search_func(mathod_name[8:].lstrip("_"))
+@imethod_factory
+def composed_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
+    if not method_name.startswith("composed_"):
+        return
+    pipe_func = search_func(method_name[9:])
 
     def method(
         iterable, *args: T_composed, key: Callable[[T_composed], Any] | None = None
@@ -208,28 +212,26 @@ def composed_pipe(mathod_name: str, /) -> Callable[..., ipartial]:
     return method
 
 
-@imethod_factory(
-    startswith(
-        (
-            "item",
-            "attr",
-            "method",
-        )
-    )
-)
-def property_pipe(method_name: str, /) -> Callable[..., ipartial]:
-    index = 4
-    kind = method_name[:index]
-    if kind.endswith("o"):
-        kind += "d"
-        index += 1
-    map_func = PipeExpr.funcs[getattr(constants, kind.upper())]
-    pipe_func = search_func(method_name[index:].lstrip("_"))
+opfuncs: dict[str, Callable] = {
+    "attr": op.attrgetter,
+    "item": op.itemgetter,
+    "method": op.methodcaller,
+}
+
+
+@imethod_factory
+def property_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
+    kind, _, func_name = method_name.partition("_")
+    if kind not in opfuncs:
+        return
+    map_func = opfuncs[kind]
+    pipe_func = search_func(func_name)
 
     def method(iterable, /, *args, **kw) -> ipartial:
         return ipartial(pipe_func, map_func(*args, **kw), iterable)
 
     return method
+    property_pipe.funcs = opfuncs
 
 
 if __name__ == "__main__":
