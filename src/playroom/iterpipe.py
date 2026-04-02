@@ -47,11 +47,6 @@ C = TypeVar("C")
 list_field = ft.partial(dt.field, default_factory=list)
 
 
-class next_func_caller(map):
-    __slots__ = ()
-    __call__ = property(next)
-
-
 @dt.dataclass(slots=True, frozen=True)
 class PipeExpr:
     args_list: list[tuple[Any, ...]] = list_field()
@@ -64,13 +59,16 @@ class PipeExpr:
             self.add(op.attrgetter, attr)
         return self
 
-    def __call__(self, *args) -> Self:
+    def __call__(self, *args, **kwargs) -> Self:
         if attr := self.last_attr():
             left, _, attr = attr.rpartition(".")
             self.args_list[-1] = (left,)
         else:
             attr = "__call__"
-        self.add(op.methodcaller, attr, *args)
+        func = op.methodcaller
+        if kwargs:
+            func = ft.partial(func, **kwargs)
+        self.add(func, attr, *args)
         return self
 
     def __getitem__(self, /, item) -> Self:
@@ -94,9 +92,6 @@ class BaseIter(Iterable):
 
     def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
         return MethodType(self.register_method(attr), self)
-
-    def starmap_funcs(funcs, args):
-        return it.starmap(next_func_caller(op.call, funcs), args)
 
     def flatten(self, /) -> ipartial:
         return ipartial(it.chain.from_iterable, self)
@@ -154,9 +149,8 @@ class BaseIter(Iterable):
         return method
 
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
-        funcs = it.starmap(next_func_caller(op.call, pipe.funcs), pipe.args_list)
-        for func in funcs:
-            iterable = ipartial(map, func, iterable)
+        for func, args in zip(pipe.funcs, pipe.args_list):
+            iterable = ipartial(map, func(*args), iterable)
         return iterable
 
 
