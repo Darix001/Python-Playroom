@@ -215,7 +215,7 @@ opfuncs: dict[str, Callable] = {
 
 @imethod_factory
 def property_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
-    kind, _, func_name = method_name.partition("_")
+    kind, _, func_name = method_name.rpartition("_")
     if kind not in opfuncs:
         return
     map_func = opfuncs[kind]
