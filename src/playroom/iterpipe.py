@@ -49,7 +49,7 @@ list_field = ft.partial(dt.field, default_factory=list)
 
 @dt.dataclass(slots=True, frozen=True)
 class PipeExpr:
-    args_list: list[tuple[Any, ...]] = list_field()
+    args_list: list[tuple[str | Any]] = list_field()
     funcs: list[Callable[..., Callable]] = list_field()
 
     def __getattr__(self, attr: str, /) -> Self:
