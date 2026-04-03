@@ -45,7 +45,7 @@ def search_func(function_name: str, /):
 
 
 def iter_method(func: ifunc_type, /):
-    return instance_method(ipartial(ipartial, func))
+    return instance_method(ft.partial(ipartial, func))
 
 
 def get_params(func: ifunc_type, /) -> Callable[..., ipartial]:
