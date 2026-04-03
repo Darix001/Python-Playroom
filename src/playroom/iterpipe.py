@@ -49,7 +49,7 @@ def iter_method(func: ifunc_type, /):
     return instance_method(ft.partial(ipartial, func))
 
 
-def get_params(func: ifunc_type, /) -> Callable[..., ipartial]:
+def to_imethod(func: ifunc_type, /) -> Callable[..., ipartial]:
     sig = signature(func)
     nparams = len(parameters := sig.parameters)
     for i, (name, param) in enumerate(parameters.items()):
@@ -156,7 +156,7 @@ class BaseIter(Iterable):
     def register_method(cls: Type[C], method_name: str, /) -> Callable[..., ipartial]:
         method = mit.first_true(
             map(op.methodcaller("__call__", method_name), factories.values()), None
-        ) or get_params(search_func(method_name))
+        ) or to_imethod(search_func(method_name))
 
         if type(method) is FunctionType:
             method.__name__ = method_name
