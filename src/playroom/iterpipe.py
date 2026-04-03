@@ -106,10 +106,17 @@ class BaseIter(Iterable):
         )
         if not method:
             parameters = signature(fn := search_func(method_name)).parameters
+            pipe_func = ft.partial(ipartial, fn)
             if (
                 iters_param := parameters.get("iterables")
             ) and iters_param.kind == iters_param.VAR_POSITIONAL:
-                method = ft.partialmethod(ipartial, fn)
+                index = op.indexOf(parameters, "iterables")
+                if not index:
+                    method = ft.partialmethod(ipartial, fn)
+                else:
+
+                    def method(self, /, *args, **kw) -> ipartial:
+                        return pipe_func(*(args[index:] + (self,) + args[:index]), **kw)
 
             elif iter_param := parameters.get("iterable"):
                 if iter_param.kind == iter_param.KEYWORD_ONLY:
@@ -120,7 +127,6 @@ class BaseIter(Iterable):
                     iter_param.POSITIONAL_ONLY,
                     iter_param.POSITIONAL_OR_KEYWORD,
                 ):
-                    pipe_func = ft.partial(ipartial, fn)
                     index = 0
                     try:
                         index = op.indexOf(param_names := parameters.keys(), "iterable")
