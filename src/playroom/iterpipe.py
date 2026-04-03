@@ -7,18 +7,13 @@ import itertools as it
 import operator as op
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from inspect import signature
-from types import MethodType, ModuleType
+from types import FunctionType, MethodType, ModuleType
 from typing import Any, Self, SupportsIndex, Type, TypeVar
 
 import more_itertools as mit
 
+from . import ifuncs
 from .methodtools import add_method
-
-ifuncs = ModuleType(
-    "ifuncs",
-    doc="This is the first module that is looked up by the register_method "
-    "classmethod of Iter class. the register_method is called by __getattr__.",
-)
 
 modules: list[Mapping[str, Callable]] = [*map(vars, (ifuncs, builtins, it, mit))]
 
@@ -93,8 +88,7 @@ class BaseIter(Iterable):
     def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
         return MethodType(self.register_method(attr), self)
 
-    def flatten(self, /) -> ipartial:
-        return ipartial(it.chain.from_iterable, self)
+    flatten = ft.partialmethod(it.chain.from_iterable)
 
     def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
@@ -112,40 +106,44 @@ class BaseIter(Iterable):
         )
         if not method:
             parameters = signature(fn := search_func(method_name)).parameters
-            if not (iterable_param := parameters.get("iterable")):
-                raise ValueError(
-                    "No 'iterable' parameter found in function signature for function "
-                    + method_name
-                )
-            if iterable_param.kind == iterable_param.POSITIONAL_ONLY:
+            if not (iter_param := parameters.get("iterable")):
+                iters_param = parameters.get("iterables")
+                if iters_param and iters_param.kind == iters_param.VAR_POSITIONAL:
+                    method = ft.partialmethod(ipartial, fn)
+                else:
+                    raise ValueError(
+                        "No 'iterable(s)' parameter found in function signature for function "
+                        + method_name
+                    )
+
+            elif iter_param.kind == iter_param.POSITIONAL_ONLY:
+                pipe_func = ft.partial(ipartial, fn)
                 index = 0
                 try:
                     index = op.indexOf(param_names := parameters.keys(), "iterable")
                 except ValueError:
                     pass
                 if not index:
-
-                    def method(self, /, *args, **kw) -> ipartial:
-                        return ipartial(fn, self, *args, **kw)
+                    method = ft.partialmethod(ipartial, fn)
 
                 elif index == len(param_names) - 1:
 
                     def method(self, /, *args, **kw) -> ipartial:
-                        return ipartial(fn, *args, self, **kw)
+                        return pipe_func(*args, self, **kw)
                 else:
 
                     def method(self, /, *args, **kw) -> ipartial:
-                        return ipartial(
-                            fn, self, *(args[index:] + (self,) + args[:index]), **kw
-                        )
+                        return pipe_func(*(args[index:] + (self,) + args[:index]), **kw)
             else:
 
                 def method(self, /, *args, **kw) -> ipartial:
-                    return ipartial(fn, *args, **kw, iterable=self)
+                    return pipe_func(*args, **kw, iterable=self)
 
+        if type(method) is FunctionType:
             method.__name__ = fn.__name__
-
-        add_method(cls, method)
+            add_method(cls, method)
+        else:
+            setattr(cls, fn.__name__, method)
         return method
 
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
