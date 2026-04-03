@@ -7,7 +7,7 @@ import itertools as it
 import operator as op
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from inspect import Parameter, signature
-from types import FunctionType, MethodType, ModuleType
+from types import FunctionType, ModuleType
 from typing import Any, Self, SupportsIndex, Type, TypeVar
 
 import more_itertools as mit
@@ -72,7 +72,7 @@ def to_imethod(func: ifunc_type, /) -> Callable[..., ipartial]:
             break
 
         if not i:  # First positional argument is the iterable(s).
-            method = instance_method(func)
+            method = iter_method(func)
 
         elif nparams - i == 1:  # last parameter is the iterable(s)
 
@@ -141,7 +141,12 @@ class BaseIter(Iterable):
     flatten: instance_method
 
     def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
-        return MethodType(self.register_method(attr), self)
+        try:
+            self.register_method(attr)
+        except (ValueError, TypeError) as e:
+            raise AttributeError from e
+        else:
+            return getattr(self, attr)
 
     def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
@@ -153,7 +158,7 @@ class BaseIter(Iterable):
         return ipartial(map, it.repeat, iterable, it.repeat(times)).flatten()
 
     @classmethod
-    def register_method(cls: Type[C], method_name: str, /) -> Callable[..., ipartial]:
+    def register_method(cls: Type[C], method_name: str, /):
         method = mit.first_true(
             map(op.methodcaller("__call__", method_name), factories.values()), None
         ) or to_imethod(search_func(method_name))
@@ -163,7 +168,6 @@ class BaseIter(Iterable):
             add_method(cls, method)
         else:
             setattr(cls, method_name, method)
-        return method
 
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
         for func, args in zip(pipe.funcs, pipe.args_list):
@@ -260,5 +264,5 @@ if __name__ == "__main__":
         str.isascii,
     )
     print(",".join(a))
-    d = MutableIter(range(10)).zip().item_map(0)
+    d = Iter(range(10)).zip().item_map(0)
     print(bytes(d))
