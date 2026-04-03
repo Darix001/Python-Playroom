@@ -26,6 +26,7 @@ ifunc_type = Callable[..., Iterable]
 R = TypeVar("R")
 V = TypeVar("V")
 C = TypeVar("C")
+T_ufunc = TypeVar("T_ufunc")
 
 get_positional_types = op.attrgetter(
     "POSITIONAL_ONLY", "VAR_POSITIONAL", "POSITIONAL_OR_KEYWORD"
@@ -173,6 +174,9 @@ class BaseIter(Iterable):
         for func, args in zip(pipe.funcs, pipe.args_list):
             iterable = ipartial(map, func(*args), iterable)
         return iterable
+
+    def map_user_func(self, ufunc: Callable):
+        return self.with_pipe(ufunc(PipeExpr()))
 
 
 class ipartial(ft.partial, BaseIter):
