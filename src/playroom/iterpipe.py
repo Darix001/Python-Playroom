@@ -106,38 +106,44 @@ class BaseIter(Iterable):
         )
         if not method:
             parameters = signature(fn := search_func(method_name)).parameters
-            if not (iter_param := parameters.get("iterable")):
-                iters_param = parameters.get("iterables")
-                if iters_param and iters_param.kind == iters_param.VAR_POSITIONAL:
-                    method = ft.partialmethod(ipartial, fn)
-                else:
-                    raise ValueError(
-                        "No 'iterable(s)' parameter found in function signature for function "
-                        + method_name
-                    )
+            if (
+                iters_param := parameters.get("iterables")
+            ) and iters_param.kind == iters_param.VAR_POSITIONAL:
+                method = ft.partialmethod(ipartial, fn)
 
-            elif iter_param.kind == iter_param.POSITIONAL_ONLY:
-                pipe_func = ft.partial(ipartial, fn)
-                index = 0
-                try:
-                    index = op.indexOf(param_names := parameters.keys(), "iterable")
-                except ValueError:
-                    pass
-                if not index:
-                    method = ft.partialmethod(ipartial, fn)
-
-                elif index == len(param_names) - 1:
+            elif iter_param := parameters.get("iterable"):
+                if iter_param.kind == iter_param.KEYWORD_ONLY:
 
                     def method(self, /, *args, **kw) -> ipartial:
-                        return pipe_func(*args, self, **kw)
-                else:
+                        return pipe_func(*args, **kw, iterable=self)
+                elif iter_param.kind in (
+                    iter_param.POSITIONAL_ONLY,
+                    iter_param.POSITIONAL_OR_KEYWORD,
+                ):
+                    pipe_func = ft.partial(ipartial, fn)
+                    index = 0
+                    try:
+                        index = op.indexOf(param_names := parameters.keys(), "iterable")
+                    except ValueError:
+                        pass
+                    if not index:
+                        method = ft.partialmethod(ipartial, fn)
 
-                    def method(self, /, *args, **kw) -> ipartial:
-                        return pipe_func(*(args[index:] + (self,) + args[:index]), **kw)
+                    elif index == len(param_names) - 1:
+
+                        def method(self, /, *args, **kw) -> ipartial:
+                            return pipe_func(*args, self, **kw)
+                    else:
+
+                        def method(self, /, *args, **kw) -> ipartial:
+                            return pipe_func(
+                                *(args[index:] + (self,) + args[:index]), **kw
+                            )
             else:
-
-                def method(self, /, *args, **kw) -> ipartial:
-                    return pipe_func(*args, **kw, iterable=self)
+                raise ValueError(
+                    "No 'iterable(s)' parameter found in function signature for function "
+                    + method_name
+                )
 
         if type(method) is FunctionType:
             method.__name__ = fn.__name__
