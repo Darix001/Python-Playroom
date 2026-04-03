@@ -175,7 +175,7 @@ class BaseIter(Iterable):
             iterable = ipartial(map, func(*args), iterable)
         return iterable
 
-    def map_user_func(self, ufunc: Callable):
+    def map_user_func(self, ufunc: Callable) -> Self | ipartial:
         return self.with_pipe(ufunc(PipeExpr()))
 
 
