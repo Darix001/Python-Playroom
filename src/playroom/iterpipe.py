@@ -6,18 +6,31 @@ import functools as ft
 import itertools as it
 import operator as op
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from inspect import signature
+from inspect import Parameter, signature
 from types import FunctionType, MethodType, ModuleType
 from typing import Any, Self, SupportsIndex, Type, TypeVar
 
 import more_itertools as mit
 
 from . import ifuncs
-from .methodtools import add_method
+from .methodtools import add_method, instance_method
 
 modules: list[Mapping[str, Callable]] = [*map(vars, (ifuncs, builtins, it, mit))]
 
 factories: dict[str, factory_type] = {}
+
+T_composed = TypeVar("T_composed")
+ifunc_type = Callable[..., Iterable]
+
+
+R = TypeVar("R")
+V = TypeVar("V")
+C = TypeVar("C")
+
+get_positional_types = op.attrgetter(
+    "POSITIONAL_ONLY", "VAR_POSITIONAL", "POSITIONAL_OR_KEYWORD"
+)
+POSITIONALS = frozenset(get_positional_types(Parameter))
 
 
 def add_lookup_module(module: ModuleType) -> None:
@@ -31,12 +44,51 @@ def search_func(function_name: str, /):
     return func
 
 
-T_composed = TypeVar("T_composed")
+def iter_method(func: ifunc_type, /):
+    return instance_method(ipartial(ipartial, func))
 
 
-R = TypeVar("R")
-V = TypeVar("V")
-C = TypeVar("C")
+def get_params(func: ifunc_type, /) -> Callable[..., ipartial]:
+    sig = signature(func)
+    nparams = len(parameters := sig.parameters)
+    for i, (name, param) in enumerate(parameters.items()):
+        if name.removesuffix("s") != "iterable":
+            continue
+
+        if param.kind not in POSITIONALS:
+            if not name.endswith("s"):
+
+                def method(self, /, *args, **kw) -> ipartial:
+                    return ipartial(func, *args, **kw, iterable=self)
+            else:
+                # This kind of functions are not acceptable.
+                # since it is unknown if the keyword argument type
+                # is an iterator/generator of iterables of a list of iterables
+                raise TypeError(
+                    "Function signature with parameter iterables as keyword only"
+                )
+
+            break
+
+        if not i:  # First positional argument is the iterable(s).
+            method = instance_method(func)
+
+        elif nparams - i == 1:  # last parameter is the iterable(s)
+
+            def method(self, /, *args, **kw) -> ipartial:
+                return ipartial(func, *args, self, **kw)
+
+        else:  # iterable
+
+            def method(self, /, *args, **kw) -> ipartial:
+                return ipartial(func, *ifuncs.insert(args, i, self), **kw)
+
+        break
+    else:
+        raise ValueError(
+            f"No 'iterable(s)' parameter found in function signature for  {func!r}"
+        )
+    return method
 
 
 list_field = ft.partial(dt.field, default_factory=list)
@@ -88,7 +140,7 @@ class BaseIter(Iterable):
     def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
         return MethodType(self.register_method(attr), self)
 
-    flatten = ft.partialmethod(it.chain.from_iterable)
+    flatten = iter_method(it.chain.from_iterable)
 
     def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
@@ -103,53 +155,7 @@ class BaseIter(Iterable):
     def register_method(cls: Type[C], method_name: str, /) -> Callable[..., ipartial]:
         method = mit.first_true(
             map(op.methodcaller("__call__", method_name), factories.values()), None
-        )
-        if not method:
-            parameters = signature(fn := search_func(method_name)).parameters
-            pipe_func = ft.partial(ipartial, fn)
-            if (
-                iters_param := parameters.get("iterables")
-            ) and iters_param.kind == iters_param.VAR_POSITIONAL:
-                index = op.indexOf(parameters, "iterables")
-                if not index:
-                    method = ft.partialmethod(ipartial, fn)
-                else:
-
-                    def method(self, /, *args, **kw) -> ipartial:
-                        return pipe_func(*(args[index:] + (self,) + args[:index]), **kw)
-
-            elif iter_param := parameters.get("iterable"):
-                if iter_param.kind == iter_param.KEYWORD_ONLY:
-
-                    def method(self, /, *args, **kw) -> ipartial:
-                        return pipe_func(*args, **kw, iterable=self)
-                elif iter_param.kind in (
-                    iter_param.POSITIONAL_ONLY,
-                    iter_param.POSITIONAL_OR_KEYWORD,
-                ):
-                    index = 0
-                    try:
-                        index = op.indexOf(param_names := parameters.keys(), "iterable")
-                    except ValueError:
-                        pass
-                    if not index:
-                        method = ft.partialmethod(ipartial, fn)
-
-                    elif index == len(param_names) - 1:
-
-                        def method(self, /, *args, **kw) -> ipartial:
-                            return pipe_func(*args, self, **kw)
-                    else:
-
-                        def method(self, /, *args, **kw) -> ipartial:
-                            return pipe_func(
-                                *(args[index:] + (self,) + args[:index]), **kw
-                            )
-            else:
-                raise ValueError(
-                    "No 'iterable(s)' parameter found in function signature for function "
-                    + method_name
-                )
+        ) or get_params(fn := search_func(method_name))
 
         if type(method) is FunctionType:
             method.__name__ = fn.__name__
@@ -190,11 +196,15 @@ def register_imethod_factory(name: str, func: factory_type) -> factory_type:
     return func
 
 
-def imethod_factory(func: factory_type | str):
-    if callable(func):
-        return register_imethod_factory(func.__name__, func)
-    else:
-        return ft.partial(register_imethod_factory, func)
+# def named_imethod_factory(
+#     name: str,
+# ) -> ft.partial[factory_type]:
+#     return ft.partial(register_imethod_factory, name)
+named_imethod_factory = ft.partial(ft.partial, register_imethod_factory)
+
+
+def imethod_factory(func: factory_type) -> factory_type:
+    return register_imethod_factory(getattr(func, "__name__", None) or repr(func), func)
 
 
 @imethod_factory
@@ -224,7 +234,7 @@ opfuncs: dict[str, Callable] = {
 
 
 @imethod_factory
-def property_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
+def named_map(method_name: str, /, opfuncs=opfuncs) -> Callable[..., ipartial] | None:
     kind, _, func_name = method_name.rpartition("_")
     if kind not in opfuncs:
         return
@@ -235,7 +245,9 @@ def property_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
         return ipartial(pipe_func, map_func(*args, **kw), iterable)
 
     return method
-    property_pipe.funcs = opfuncs
+
+
+named_map.funcs = opfuncs
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterable, Iterator
 from functools import partial
-from itertools import starmap
+from itertools import chain, islice, starmap
 from operator import call
 from typing import Any, TypeVar
 
@@ -16,3 +16,7 @@ def zip_with(
     func: Callable[[T_zip_with], R_zip_with], *iterables: Iterable[T_zip_with]
 ) -> Iterator[R_zip_with]:
     return starmap(func, zip(*iterables))
+
+
+def insert(iterable: Iterable, n: int, *objs: Any) -> Iterator:
+    return chain(islice(iterator := iter(iterable), n), objs, iterator)
