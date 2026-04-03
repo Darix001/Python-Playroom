@@ -37,8 +37,9 @@ def add_lookup_module(module: ModuleType) -> None:
     modules.append(vars(module))
 
 
-def search_func(function_name: str, /):
-    func = mit.first_true(modules, None, op.methodcaller("get", function_name))
+def search_func(function_name: str, /) -> ifunc_type:
+    funcs = map(op.methodcaller("get", function_name), modules)
+    func = mit.first_true(funcs, None)
     if func is None:
         raise ValueError("Function Name not found: " + function_name)
     return func
@@ -137,10 +138,10 @@ class PipeExpr:
 class BaseIter(Iterable):
     __slots__ = ()
 
+    flatten: instance_method
+
     def __getattr__(self, attr: str, /) -> Callable[..., ipartial]:
         return MethodType(self.register_method(attr), self)
-
-    flatten = iter_method(it.chain.from_iterable)
 
     def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
@@ -155,13 +156,13 @@ class BaseIter(Iterable):
     def register_method(cls: Type[C], method_name: str, /) -> Callable[..., ipartial]:
         method = mit.first_true(
             map(op.methodcaller("__call__", method_name), factories.values()), None
-        ) or get_params(fn := search_func(method_name))
+        ) or get_params(search_func(method_name))
 
         if type(method) is FunctionType:
-            method.__name__ = fn.__name__
+            method.__name__ = method_name
             add_method(cls, method)
         else:
-            setattr(cls, fn.__name__, method)
+            setattr(cls, method_name, method)
         return method
 
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
@@ -174,6 +175,8 @@ class ipartial(ft.partial, BaseIter):
     __slots__ = ()
     __iter__ = ft.partial.__call__
 
+
+BaseIter.flatten = iter_method(it.chain.from_iterable)
 
 Iter = ft.partial(ipartial, iter)
 
@@ -247,7 +250,7 @@ def named_map(method_name: str, /, opfuncs=opfuncs) -> Callable[..., ipartial] |
     return method
 
 
-named_map.funcs = opfuncs
+setattr(named_map, "funcs", opfuncs)
 
 
 if __name__ == "__main__":
@@ -257,5 +260,5 @@ if __name__ == "__main__":
         str.isascii,
     )
     print(",".join(a))
-    d = MutableIter(zip(range(10))).item_map(0)
+    d = MutableIter(range(10)).zip().item_map(0)
     print(bytes(d))
