@@ -28,3 +28,32 @@ class instance_method(property):
     @property
     def __isabstractmethod__(self, /) -> bool:
         return getattr(self.fget, "__isabstractmethod__", False)
+
+
+class ReadOnlyPrivateDescriptor(property):
+    name = None
+
+    def __set_name__(self, owner, name):
+        if self.name is not None:
+            raise AttributeError("Cannot set name twice")
+        self.name = name
+        fget = attrgetter(f"_{name}")
+        super().__init__(fget)
+
+
+class PrivateDescriptor(ReadOnlyPrivateDescriptor):
+    name = None
+
+    def __set_name__(self, owner, name):
+        if self.name is not None:
+            raise AttributeError("Cannot set name twice")
+        self.name = name
+        fget = attrgetter(name := "_" + name)
+
+        def fset(self, value, /):
+            setattr(self, name, value)
+
+        def fdel(self, /):
+            delattr(self, name)
+
+        super().__init__(fget, fset, fdel)
