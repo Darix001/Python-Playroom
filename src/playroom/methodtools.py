@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
-from types import MethodType
+from types import FunctionType, MethodType
 
 
 def delegate(attr: str, doc: str | None = None) -> property:
@@ -41,13 +41,28 @@ class ReadOnlyPrivateDescriptor:
 
 
 class PrivateDescriptor(ReadOnlyPrivateDescriptor):
-    def __set_name__(self, owner, name):
+    @staticmethod
+    def fset(self, value, /):
+        self.attrname = value
+
+    @staticmethod
+    def fdel(self, /):
+        del self.attrname
+
+    def __set_name__(self, owner: type, name: str):
         fget = attrgetter(name := "_" + name)
-
-        def fset(self, value, /):
-            setattr(self, name, value)
-
-        def fdel(self, /):
-            delattr(self, name)
+        co_names = (name,)
+        fset = replace_code_co_names(co_names, self.fset, "set_" + name)
+        fdel = replace_code_co_names(co_names, self.fdel, "del_" + name)
 
         setattr(owner, name, property(fget, fset, fdel, self.doc))
+
+
+def replace_code_co_names(
+    co_names: tuple[str],
+    func: FunctionType,
+    /,
+    *args,
+    globals=globals(),
+):
+    return FunctionType(func.__code__.replace(co_names=co_names), globals, *args)
