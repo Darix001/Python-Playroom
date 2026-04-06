@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
 from types import MethodType
@@ -30,24 +31,17 @@ class instance_method(property):
         return getattr(self.fget, "__isabstractmethod__", False)
 
 
-class ReadOnlyPrivateDescriptor(property):
-    name = None
+@dataclass
+class ReadOnlyPrivateDescriptor:
+    doc: str | None = None
 
     def __set_name__(self, owner, name):
-        if self.name is not None:
-            raise AttributeError("Cannot set name twice")
         self.name = name
-        fget = attrgetter(f"_{name}")
-        super().__init__(fget)
+        setattr(owner, name, property(attrgetter("_" + name), doc=self.doc))
 
 
 class PrivateDescriptor(ReadOnlyPrivateDescriptor):
-    name = None
-
     def __set_name__(self, owner, name):
-        if self.name is not None:
-            raise AttributeError("Cannot set name twice")
-        self.name = name
         fget = attrgetter(name := "_" + name)
 
         def fset(self, value, /):
@@ -56,4 +50,4 @@ class PrivateDescriptor(ReadOnlyPrivateDescriptor):
         def fdel(self, /):
             delattr(self, name)
 
-        super().__init__(fget, fset, fdel)
+        setattr(owner, name, property(fget, fset, fdel, self.doc))
