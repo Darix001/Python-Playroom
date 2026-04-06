@@ -87,9 +87,7 @@ def to_imethod(func: ifunc_type, /) -> Callable[..., ipartial]:
 
         break
     else:
-        raise ValueError(
-            f"No 'iterable(s)' parameter found in function signature for  {func!r}"
-        )
+        method = iter_method(func)
     return method
 
 
