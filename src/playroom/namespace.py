@@ -25,5 +25,3 @@ class FunctionalNamespace(SimpleNamespace, Generic[T]):
 
 
 FuncNamespace = FunctionalNamespace
-data = FuncNamespace[str]("{}".format, a=1, b=4, c=0.12)
-print(data.__dict__)
