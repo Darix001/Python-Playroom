@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import builtins
 import dataclasses as dt
 import functools as ft
