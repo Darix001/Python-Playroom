@@ -50,7 +50,7 @@ from operator import methodcaller, attrgetter
   mutable_iterable = iterpipe.MutableIter()
   pipe = iterpipe.MutIter().method_filter('is_file').attr_map('name').method_filter('endswith', '.py')
   with dir_objects as os.scandir('.'):
-  mutable_iterable.iterable = dir_objects
-      ", ".join(pipe)
+      mutable_iterable.iterable = dir_objects
+          ", ".join(pipe)
 ```
 
