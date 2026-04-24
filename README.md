@@ -53,4 +53,4 @@ from operator import methodcaller, attrgetter
       mutable_iterable.iterable = dir_objects
           ", ".join(pipe)
 ```
-
+Not only is the later improves readability, but it also is much more faster than a generator or that a long itertools pipe that needs to be evaluated each time it is executed. And things just get better when you discover the iter_method_factory api in the iterpipe module.
