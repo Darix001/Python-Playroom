@@ -6,35 +6,37 @@ Example #1: DRY
 
 a common scenario in python, we have a custom class, with a group of private attributes, that we made public for access by properties,
 but as we have more private attributes, the code becomes more and more repetitive:
-
+```python
 class Person:
-  @property
-  def name(self):
-    return self._name
+    @property
+    def name(self):
+        return self._name
   
-  @property
-  def lastname(self):
-    return self._lastname
+    @property
+    def lastname(self):
+        return self._lastname
   
-  @property
-  def gender(self):
-    return self._gender
+    @property
+    def gender(self):
+        return self._gender
   
-  @property
-  def age(self):
-    return self._age
-  
+    @property
+    def age(self):
+        return self._age
+  ```
 
 Now let's see how the code looks with the methodtools.ReadOnlyPrivateDescriptor tool:
-
+```python
 class Person:
   name = lastname = gender = age = ReadOnlyPrivateDescriptor()
+```
 
 Wow!! that was a huge save of lines of code, from 16 to only 2 lines of code.
 
 Example #2:
 Every Experienced Python Programmer knows the itertools module. It is such an used and loved modules that there is a whole module dedicated to extend it's funcionality called the more_itertools. But sometimes, writing nested pipe with itertools.module makes the codeless readable. That's why people often just use sugar syntax like generators or list comprehesion. This is the pythonic way of writing generators, but sometimes you loss performance to gain more readability. With the iterpipe module in action, this is a concern of the past.
 
+```python
 from operator import methodcaller, attrgetter
   #Normal code with itertools and builtins
   with dir_objects as os.scandir('.'):
@@ -48,5 +50,7 @@ from operator import methodcaller, attrgetter
   mutable_iterable = iterpipe.MutableIter()
   pipe = iterpipe.MutIter().method_filter('is_file').attr_map('name').method_filter('endswith', '.py')
   with dir_objects as os.scandir('.'):
-    mutable_iterable.iterable = dir_objects
-    ",".join(pipe)
+  mutable_iterable.iterable = dir_objects
+      ", ".join(pipe)
+```
+
