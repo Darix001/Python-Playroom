@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
 from types import FunctionType, MethodType
+from typing import Any
 
 
 def delegate(attr: str, doc: str | None = None) -> property:
@@ -66,3 +67,12 @@ def replace_code_co_names(
     globals=globals(),
 ):
     return FunctionType(func.__code__.replace(co_names=co_names), globals, *args)
+
+
+@dataclass
+class SetNameFactory:
+    __slots__ = ()
+    factory: Callable[[str], Callable[..., Any]]
+
+    def __set_name__(self, cls, name):
+        add_method(cls, self.factory(name))
