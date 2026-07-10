@@ -69,9 +69,8 @@ def replace_code_co_names(
     return FunctionType(func.__code__.replace(co_names=co_names), globals, *args)
 
 
-@dataclass
+@dataclass(frozen=True, repr=False, slots=True)
 class SetNameFactory:
-    __slots__ = ()
     factory: Callable[[str], Callable[..., Any]]
 
     def __set_name__(self, cls, name):
