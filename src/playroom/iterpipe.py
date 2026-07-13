@@ -163,8 +163,7 @@ class BaseIter(Iterable):
         ) or to_imethod(search_func(method_name))
 
         if type(method) is FunctionType:
-            method.__name__ = method_name
-            add_method(cls, method)
+            add_method(cls, method_name, method)
         else:
             setattr(cls, method_name, method)
 
