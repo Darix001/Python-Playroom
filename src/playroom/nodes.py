@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 from collections.abc import Iterator, Sized
 from dataclasses import dataclass
+from io import StringIO
+from re import split
 from typing import Any, Optional
 
 
@@ -9,8 +13,14 @@ class RecursiveNode(Sized):
     left: Optional[RecursiveNode] = None
     right: Optional[RecursiveNode] = None
 
-    def __str__(self, /):
-        return f"({self.left} <- {self.value} -> {self.right})"
+    def __str__(self, /) -> str:
+        string = f"{self.value!s}"
+        if left := self.left:
+            string = f"{left!s} ← {string}"
+
+        if right := self.right:
+            string += f" → {right!s}"
+        return f"({string})"
 
     def __len__(self, /):
         left_count = len(left) if (left := self.left) is not None else 0

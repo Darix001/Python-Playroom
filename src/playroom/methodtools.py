@@ -14,9 +14,11 @@ def attach_to_class(cls) -> partial[Callable]:
     return partial(add_method, cls)
 
 
-def add_method(cls, func):
-    setattr(cls, func.__name__, func)
-    func.__qualname__ = f"{cls.__name__}.{func.__name__}"
+def add_method(cls, name: str | None, func):
+    if not name:
+        name = func.__name__
+    setattr(cls, name, func)
+    func.__qualname__ = f"{cls.__name__}.{name}"
     func.__module__ = cls.__module__
     return func
 
@@ -70,8 +72,10 @@ def replace_code_co_names(
 
 
 @dataclass(frozen=True, repr=False, slots=True)
-class SetNameFactory:
-    factory: Callable[[str], Callable[..., Any]]
+class SetNameFactory[T]:
+    factory: Callable[[str], T]
+    attacher: Callable[[Any, str, T], Any] = setattr
 
-    def __set_name__(self, cls, name):
-        add_method(cls, self.factory(name))
+    def __set_name__(self, cls: type, name: str):
+        self.attacher(cls, name, self.factory(name))
+
