@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sized
 from dataclasses import dataclass
-from io import StringIO
-from re import split
 from typing import Any, Optional
 
 

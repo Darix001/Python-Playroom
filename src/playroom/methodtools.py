@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
-from types import FunctionType, MethodType
+from types import FunctionType, MethodType, SimpleNamespace
 from typing import Any
 
 
@@ -78,3 +78,13 @@ class SetNameFactory[T]:
 
     def __set_name__(self, cls: type, name: str):
         self.attacher(cls, name, self.factory(name))
+
+
+METHODS = SimpleNamespace(
+    UNARIES="abs pos neg inv invert",
+    SEQUENCE="iter reversed bool len",
+    ARITHMETICS="add sub truediv floordiv mul pow mod",
+    LOGICAL="and or xor",
+)
+for k, v in vars(METHODS).items():
+    setattr(METHODS, k, [f"__{method_name}__" for method_name in v.split()])

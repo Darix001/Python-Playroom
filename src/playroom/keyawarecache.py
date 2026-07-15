@@ -1,9 +1,6 @@
-import itertools as it
-import operator as op
-from collections.abc import Callable, Iterator, Sequence
-from functools import wraps
+from collections.abc import Callable
 from string import digits
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 rdigits = digits[::-1]
 
