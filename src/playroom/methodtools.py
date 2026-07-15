@@ -80,11 +80,18 @@ class SetNameFactory[T]:
         self.attacher(cls, name, self.factory(name))
 
 
-METHODS = SimpleNamespace(
-    UNARIES="abs pos neg inv invert",
-    SEQUENCE="iter reversed bool len",
-    ARITHMETICS="add sub truediv floordiv mul pow mod",
-    LOGICAL="and or xor",
+UNARY_METHODS = ("__abs__", "__pos__", "__neg__", "__inv__", "__invert__")
+SEQUENCE_UNARY_METHODS = ("__iter__", "__reversed__", "__bool__", "__len__")
+SEQUENCE_BINARY_METHODS = ("__getitem__", "__delitem__")
+SEQUENCE_METHODS = SEQUENCE_UNARY_METHODS + SEQUENCE_BINARY_METHODS
+ARITHMETIC_METHODS = (
+    "__add__",
+    "__sub__",
+    "__truediv__",
+    "__floordiv__",
+    "__mul__",
+    "__pow__",
+    "__mod__",
 )
-for k, v in vars(METHODS).items():
-    setattr(METHODS, k, [f"__{method_name}__" for method_name in v.split()])
+LOGICAL_METHODS = ("__and__", "__or__", "__xor__")
+BINARY_METHODS = ARITHMETIC_METHODS + LOGICAL_METHODS
