@@ -26,7 +26,11 @@ def add_method(cls, name: str | None, func):
     return func
 
 
+@dataclass(frozen=True)
 class instance_method(property):
+    __slots__ = ()
+    fget: partial
+
     def __init__(self, func: Callable, doc: str | None = None):
         super().__init__(partial(MethodType, func), doc=doc)
 
@@ -34,7 +38,7 @@ class instance_method(property):
 
     @property
     def __isabstractmethod__(self, /) -> bool:
-        return getattr(self.fget, "__isabstractmethod__", False)
+        return getattr(self.fget.args[0], "__isabstractmethod__", False)
 
 
 @dataclass
