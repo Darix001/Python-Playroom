@@ -95,3 +95,13 @@ ARITHMETIC_METHODS = (
 )
 LOGICAL_METHODS = ("__and__", "__or__", "__xor__")
 BINARY_METHODS = ARITHMETIC_METHODS + LOGICAL_METHODS
+RIGHT_ARITHMETIC_METHODS = (
+    "__radd__",
+    "__rsub__",
+    "__rtruediv__",
+    "__rfloordiv__",
+    "__rmul__",
+    "__rpow__",
+    "__rmod__",
+)
+RIGHT_LOGICAL_METHODS = ("__rand__", "__ror__", "__rxor__")
