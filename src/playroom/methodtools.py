@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
-from types import FunctionType, MethodType, SimpleNamespace
+from types import FunctionType, MethodType
 from typing import Any
 
 
