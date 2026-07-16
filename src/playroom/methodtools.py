@@ -74,7 +74,7 @@ def replace_code_co_names(
 @dataclass(frozen=True, repr=False, slots=True)
 class SetNameFactory[T]:
     factory: Callable[[str], T]
-    attacher: Callable[[Any, str, T], Any] = add_method
+    attacher: Callable[[type, str, T], Any] = add_method
 
     def __set_name__(self, cls: type, name: str):
         self.attacher(cls, name, self.factory(name))
