@@ -1,3 +1,6 @@
+import builtins
+import operator
+from collections import ChainMap
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
@@ -105,3 +108,14 @@ RIGHT_ARITHMETIC_METHODS = (
     "__rmod__",
 )
 RIGHT_LOGICAL_METHODS = ("__rand__", "__ror__", "__rxor__")
+
+
+dunder_functions_lookup = ChainMap(vars(builtins), vars(operator))
+
+
+def dunder_method_factory(func: Callable[[Callable], Callable], /):
+    @SetNameFactory
+    def factory(name: str, /):
+        return func(dunder_functions_lookup[name.strip("_")])
+
+    return factory
