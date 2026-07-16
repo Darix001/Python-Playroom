@@ -14,7 +14,7 @@ def delegate(attr: str, doc: str | None = None) -> property:
 
 
 def attach_to_class(cls) -> partial[Callable]:
-    return partial(add_method, cls)
+    return partial(add_method, cls, None)
 
 
 def add_method(cls, name: str | None, func):
