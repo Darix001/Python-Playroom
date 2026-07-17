@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
 from types import FunctionType, MethodType
-from typing import Any
+from typing import Any, Optional
 
 
 def delegate(attr: str, doc: str | None = None) -> property:
@@ -33,7 +33,7 @@ class instance_method(property):
     __slots__ = ()
     fget: partial
 
-    def __init__(self, func: Callable, doc: str | None = None):
+    def __init__(self, func: Callable, doc: Optional[str] = None):
         super().__init__(partial(MethodType, func), doc=doc)
 
     __call__ = delegate("fget")
