@@ -51,7 +51,10 @@ def iter_method(func: ifunc_type, /):
 
 
 def to_imethod(func: ifunc_type, /) -> Callable[..., ipartial]:
-    sig = signature(func)
+    try:
+        sig = signature(func)
+    except (ValueError, RecursionError):
+        return iter_method(func)
     nparams = len(parameters := sig.parameters)
     for i, (name, param) in enumerate(parameters.items()):
         if name.removesuffix("s") != "iterable":
@@ -166,6 +169,8 @@ class BaseIter(Iterable):
             add_method(cls, method_name, method)
         else:
             setattr(cls, method_name, method)
+
+        return method
 
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
         for func, args in zip(pipe.funcs, pipe.args_list):

@@ -30,10 +30,13 @@ def add_method(cls, name: str | None, func):
     return func
 
 
-@frozen
-class instance_method[T](property):
-    fget: partial[T] = field(converter=partial(partial, MethodType))
+class instance_method(property):
+    __slots__ = "__doc__"
+    fget: partial
     doc: Optional[str] = field(kw_only=True, default=None)
+
+    def __init__(self, fget: Callable[..., Any], doc: Optional[str] = None):
+        super().__init__(partial(MethodType, fget), doc=doc)
 
     __call__ = delegate("fget")
 
