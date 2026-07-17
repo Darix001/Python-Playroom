@@ -170,8 +170,6 @@ class BaseIter(Iterable):
         else:
             setattr(cls, method_name, method)
 
-        return method
-
     def with_pipe(iterable, /, pipe: PipeExpr) -> Self | ipartial:
         for func, args in zip(pipe.funcs, pipe.args_list):
             iterable = ipartial(map, func(*args), iterable)
