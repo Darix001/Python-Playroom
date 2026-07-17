@@ -5,11 +5,12 @@ import operator
 import os
 from collections import ChainMap
 from collections.abc import Callable
-from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
 from types import FunctionType, MethodType
 from typing import Any, Optional
+
+from attrs import field, frozen
 
 
 def delegate(attr: str, doc: str | None = None) -> property:
@@ -29,12 +30,10 @@ def add_method(cls, name: str | None, func):
     return func
 
 
-class instance_method(property):
-    __slots__ = ()
-    fget: partial
-
-    def __init__(self, func: Callable, doc: Optional[str] = None):
-        super().__init__(partial(MethodType, func), doc=doc)
+@frozen
+class instance_method[T](property):
+    fget: partial[T] = field(converter=partial(partial, MethodType))
+    doc: Optional[str] = field(kw_only=True)
 
     __call__ = delegate("fget")
 
@@ -43,12 +42,11 @@ class instance_method(property):
         return getattr(self.fget.args[0], "__isabstractmethod__", False)
 
 
-@dataclass
+@frozen
 class ReadOnlyPrivateDescriptor:
-    doc: str | None = None
+    doc: Optional[str] = field(kw_only=True)
 
     def __set_name__(self, owner, name):
-        self.name = name
         setattr(owner, name, property(attrgetter("_" + name), doc=self.doc))
 
 
@@ -80,7 +78,7 @@ def replace_code_co_names(
     return FunctionType(func.__code__.replace(co_names=co_names), globals, *args)
 
 
-@dataclass(frozen=True, repr=False, slots=True)
+@frozen(repr=False, slots=True)
 class SetNameFactory[T]:
     factory: Callable[[str], T]
     attacher: Callable[[type, str, T], Any] = add_method

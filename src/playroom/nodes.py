@@ -54,4 +54,6 @@ a = RecursiveNode(
 )
 
 Node = RecursiveNode
-print(a, len(a), a.height(), tuple(a), tuple(reversed(a)), sep="\n")
+
+if __name__ == "__main__":
+    print(a, len(a), a.height(), tuple(a), tuple(reversed(a)), sep="\n")
