@@ -29,7 +29,6 @@ def add_method(cls, name: str | None, func):
     return func
 
 
-@dataclass(frozen=True)
 class instance_method(property):
     __slots__ = ()
     fget: partial
