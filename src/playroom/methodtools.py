@@ -117,7 +117,7 @@ RIGHT_ARITHMETIC_METHODS = (
 RIGHT_LOGICAL_METHODS = ("__rand__", "__ror__", "__rxor__")
 
 
-dunder_functions_lookup = ChainMap(*map(vars, ({}, builtins, operator, math, copy, os)))
+dunder_functions_lookup = ChainMap({}, *map(vars, (builtins, operator, math, copy, os)))
 
 
 def dunder_method_factory(func: Callable[[Callable], Callable], /):
