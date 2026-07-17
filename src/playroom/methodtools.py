@@ -1,5 +1,8 @@
 import builtins
+import copy
+import math
 import operator
+import os
 from collections import ChainMap
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -114,7 +117,7 @@ RIGHT_ARITHMETIC_METHODS = (
 RIGHT_LOGICAL_METHODS = ("__rand__", "__ror__", "__rxor__")
 
 
-dunder_functions_lookup = ChainMap(vars(builtins), vars(operator))
+dunder_functions_lookup = ChainMap(*map(vars, ({}, builtins, operator, math, copy, os)))
 
 
 def dunder_method_factory(func: Callable[[Callable], Callable], /):
