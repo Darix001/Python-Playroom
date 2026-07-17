@@ -1,1 +1,10 @@
-__all__ = ["compose", "iterpipe", "keyawarecache", "polartools", "fib", "digits"]
+__all__ = [
+    "compose",
+    "iterpipe",
+    "dicttools",
+    "polartools",
+    "fib",
+    "digits",
+    "namespace",
+    "nodes",
+]
