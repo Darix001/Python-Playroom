@@ -33,7 +33,7 @@ def add_method(cls, name: str | None, func):
 @frozen
 class instance_method[T](property):
     fget: partial[T] = field(converter=partial(partial, MethodType))
-    doc: Optional[str] = field(kw_only=True)
+    doc: Optional[str] = field(kw_only=True, default=None)
 
     __call__ = delegate("fget")
 
