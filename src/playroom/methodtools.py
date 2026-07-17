@@ -44,7 +44,7 @@ class instance_method[T](property):
 
 @frozen
 class ReadOnlyPrivateDescriptor:
-    doc: Optional[str] = field(kw_only=True)
+    doc: Optional[str] = field(default=None, kw_only=True)
 
     def __set_name__(self, owner, name):
         setattr(owner, name, property(attrgetter("_" + name), doc=self.doc))
