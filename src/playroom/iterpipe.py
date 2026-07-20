@@ -207,10 +207,6 @@ def register_imethod_factory(name: str, func: factory_type) -> factory_type:
     return func
 
 
-# def named_imethod_factory(
-#     name: str,
-# ) -> ft.partial[factory_type]:
-#     return ft.partial(register_imethod_factory, name)
 named_imethod_factory = ft.partial(ft.partial, register_imethod_factory)
 
 
