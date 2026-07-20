@@ -185,7 +185,8 @@ class BaseIter[T](Iterable[T]):
 
 class ipartial[T](ft.partial[T], BaseIter[T]):
     __slots__ = ()
-    __iter__ = ft.partial.__call__
+    __iter__: Callable[..., Iterator[T]] = ft.partial.__call__
+    __call__: Callable[..., Iterator[T]]
 
 
 BaseIter.flatten = iter_method(it.chain.from_iterable)
@@ -200,17 +201,19 @@ class MutableIter[T](BaseIter[T]):
     def __iter__(self, /) -> Iterator[T]:
         return iter(self.iterable)
 
-    @classmethod
-    def from_callable(cls, expr: Callable[[MutableIter], ipartial]):
-        pipe = expr(self := cls())
 
-        def function(iterable: Iterable[T], /) -> Iterator[T]:
-            self.iterable = iterable
-            iterator = pipe()
-            del self.iterable
-            return iterator
+def ipipe[I, O](
+    expr: Callable[[MutableIter[I]], ipartial[O]],
+) -> Callable[[Iterable[I]], Iterator[O]]:
+    pipe = expr(self := MutableIter[I]())
 
-        return function
+    def function(iterable: Iterable[I], /) -> Iterator[O]:
+        self.iterable = iterable
+        iterator = pipe()
+        del self.iterable
+        return iterator
+
+    return function
 
 
 MutIter = MutableIter
@@ -281,7 +284,7 @@ if __name__ == "__main__":
     )
     print(a.scalar(",".join))
 
-    @MutableIter.from_callable
+    @ipipe
     def pairs_hex_blob(iterable: MutableIter[int]) -> ipartial[bytes]:
         return iterable.filterfalse(op.methodcaller("__mod__", 2)).composed_map(
             op.methodcaller("encode"), hex
