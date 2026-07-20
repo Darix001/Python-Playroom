@@ -19,14 +19,10 @@ modules: list[Mapping[str, Callable]] = [*map(vars, (ifuncs, builtins, it, mit))
 
 factories: dict[str, factory_type] = {}
 
-T_composed = TypeVar("T_composed")
 ifunc_type = Callable[..., Iterable]
 
 
-R = TypeVar("R")
-V = TypeVar("V")
 C = TypeVar("C")
-T_ufunc = TypeVar("T_ufunc")
 
 get_positional_types = op.attrgetter(
     "POSITIONAL_ONLY", "VAR_POSITIONAL", "POSITIONAL_OR_KEYWORD"
@@ -137,7 +133,7 @@ class PipeExpr:
         return type(self)(self.args_list.copy(), self.funcs.copy())
 
 
-class BaseIter(Iterable):
+class BaseIter[T](Iterable[T]):
     __slots__ = ()
 
     flatten: instance_method
@@ -150,10 +146,10 @@ class BaseIter(Iterable):
         else:
             return getattr(self, attr)
 
-    def reduce(self, func: Callable[[Any, Any], V], /, *initial) -> V:
+    def reduce[V](self, func: Callable[[Any, Any], V], /, *initial) -> V:
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
 
-    def scalar(self, func: Callable[[Iterable], R]) -> R:
+    def scalar[R](self, func: Callable[[Iterable], R]) -> R:
         return func(self)
 
     def repeat_each(iterable, times: SupportsIndex):
@@ -175,11 +171,11 @@ class BaseIter(Iterable):
             iterable = ipartial(map, func(*args), iterable)
         return iterable
 
-    def map_user_func(self, ufunc: Callable) -> Self | ipartial:
+    def map_lambda(self, ufunc: Callable) -> Self | ipartial:
         return self.with_pipe(ufunc(PipeExpr()))
 
 
-class ipartial(ft.partial, BaseIter):
+class ipartial[T](ft.partial[T], BaseIter[T]):
     __slots__ = ()
     __iter__ = ft.partial.__call__
 
@@ -190,10 +186,10 @@ Iter = ft.partial(ipartial, iter)
 
 
 @dt.dataclass(slots=True)
-class MutableIter(BaseIter):
-    iterable: Iterable = ()
+class MutableIter[T](BaseIter[T]):
+    iterable: Iterable[T] = ()
 
-    def __iter__(self, /) -> Iterator:
+    def __iter__(self, /) -> Iterator[T]:
         return iter(self.iterable)
 
 
@@ -220,7 +216,7 @@ def composed_pipe(method_name: str, /) -> Callable[..., ipartial] | None:
         return
     pipe_func = search_func(method_name[9:])
 
-    def method(
+    def method[T_composed](
         iterable, *args: T_composed, key: Callable[[T_composed], Any] | None = None
     ) -> ipartial:
         funcs = reversed(args)
