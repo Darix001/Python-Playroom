@@ -8,7 +8,7 @@ import operator as op
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from inspect import Parameter, signature
 from types import FunctionType, ModuleType
-from typing import Any, Self, SupportsIndex, Type, TypeVar
+from typing import Any, Self, SupportsIndex, Type, TypeVar, overload
 
 import more_itertools as mit
 
@@ -42,7 +42,7 @@ def search_func(function_name: str, /) -> ifunc_type:
     return func
 
 
-def iter_method(func: ifunc_type, /):
+def iter_method(func: ifunc_type, /) -> instance_method:
     return instance_method(ft.partial(ipartial, func))
 
 
@@ -146,7 +146,15 @@ class BaseIter[T](Iterable[T]):
         else:
             return getattr(self, attr)
 
-    def reduce[V](self, func: Callable[[Any, Any], V], /, *initial) -> V:
+    @overload
+    def reduce(self, func: Callable[[T, T], T]) -> T:
+        pass
+
+    @overload
+    def reduce[V](self, func: Callable[[Any, Any], V], /, *initial: Any) -> V:
+        pass
+
+    def reduce(self, func, /, *initial):
         return ft.reduce(func, self, *initial) if initial else ft.reduce(func, self)
 
     def scalar[R](self, func: Callable[[Iterable], R]) -> R:
@@ -185,12 +193,24 @@ BaseIter.flatten = iter_method(it.chain.from_iterable)
 Iter = ft.partial(ipartial, iter)
 
 
-@dt.dataclass(slots=True)
+@dt.dataclass(slots=True, repr=False)
 class MutableIter[T](BaseIter[T]):
     iterable: Iterable[T] = ()
 
     def __iter__(self, /) -> Iterator[T]:
         return iter(self.iterable)
+
+    @classmethod
+    def from_callable(cls, expr: Callable[[MutableIter], ipartial]):
+        pipe = expr(self := cls())
+
+        def function(iterable: Iterable[T], /) -> Iterator[T]:
+            self.iterable = iterable
+            iterator = pipe()
+            del self.iterable
+            return iterator
+
+        return function
 
 
 MutIter = MutableIter
@@ -259,6 +279,12 @@ if __name__ == "__main__":
         str.islower,
         str.isascii,
     )
-    print(",".join(a))
-    d = Iter(range(10)).zip().item_map(0)
-    print(bytes(d))
+    print(a.scalar(",".join))
+
+    @MutableIter.from_callable
+    def pairs_hex_blob(iterable: MutableIter[int]) -> ipartial[bytes]:
+        return iterable.filterfalse(op.methodcaller("__mod__", 2)).composed_map(
+            op.methodcaller("encode"), hex
+        )
+
+    print(b"-".join(pairs_hex_blob(range(12, 1200, 34))))
