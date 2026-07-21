@@ -30,7 +30,7 @@ class KeyAwareCache[K, V](dict[K, V]):
         return value
 
 
-class SentinelDict[K, V, S](dict[K, V]):
+class SentinelDict[K, V, S](dict[K, V | S]):
     __slots__ = "__missing__"
     __missing__: partial[S]
 
@@ -48,5 +48,3 @@ class SentinelDict[K, V, S](dict[K, V]):
             else repeat(sentinel),
         )
         super().__init__(iterable, **kw)
-
-    __getitem__: Callable[[Self, K], V | S]

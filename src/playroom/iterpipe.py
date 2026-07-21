@@ -8,7 +8,7 @@ import operator as op
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from inspect import Parameter, signature
 from types import FunctionType, ModuleType
-from typing import Any, Self, SupportsIndex, Type, TypeVar, overload
+from typing import Any, Self, SupportsIndex, overload
 
 import more_itertools as mit
 
@@ -22,12 +22,11 @@ factories: dict[str, factory_type] = {}
 ifunc_type = Callable[..., Iterable]
 
 
-C = TypeVar("C")
-
-get_positional_types = op.attrgetter(
-    "POSITIONAL_ONLY", "VAR_POSITIONAL", "POSITIONAL_OR_KEYWORD"
-)
-POSITIONALS = frozenset(get_positional_types(Parameter))
+POSITIONALS = {
+    Parameter.POSITIONAL_ONLY,
+    Parameter.VAR_POSITIONAL,
+    Parameter.POSITIONAL_OR_KEYWORD,
+}
 
 
 def add_lookup_module(module: ModuleType) -> None:
@@ -164,7 +163,7 @@ class BaseIter[T](Iterable[T]):
         return ipartial(map, it.repeat, iterable, it.repeat(times)).flatten()
 
     @classmethod
-    def register_method(cls: Type[C], method_name: str, /):
+    def register_method(cls, method_name: str, /):
         method = mit.first_true(
             map(op.methodcaller("__call__", method_name), factories.values()), None
         ) or to_imethod(search_func(method_name))
@@ -274,20 +273,3 @@ def named_map(method_name: str, /, opfuncs=opfuncs) -> Callable[..., ipartial] |
 
 
 setattr(named_map, "funcs", opfuncs)
-
-
-if __name__ == "__main__":
-    a = MutableIter[str]("DXctuIvfUTFD^%4#^%*&GOGuibcTRxcKY").composed_filter(
-        str.isalpha,
-        str.islower,
-        str.isascii,
-    )
-    print(a.scalar(",".join))
-
-    @ipipe
-    def pairs_hex_blob(iterable: MutableIter[int]) -> ipartial[bytes]:
-        return iterable.filterfalse(op.methodcaller("__mod__", 2)).composed_map(
-            op.methodcaller("encode"), hex
-        )
-
-    print(b"-".join(pairs_hex_blob(range(12, 1200, 34))))

@@ -5,6 +5,7 @@ import operator
 import os
 from collections import ChainMap
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 from operator import attrgetter
 from types import FunctionType, MethodType
@@ -126,3 +127,11 @@ def dunder_method_factory(func: Callable[[Callable], Callable], /):
         return func(dunder_functions_lookup[name.strip("_")])
 
     return factory
+
+
+@dataclass(frozen=True)
+class OnSetName:
+    factory: Callable[[type, str], Any]
+
+    def __set_name__(self, cls, name):
+        return self.factory(cls, name)
