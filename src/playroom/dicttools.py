@@ -1,9 +1,12 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from functools import partial
-from itertools import repeat
+from functools import partial, reduce
+from itertools import chain, repeat
+from operator import methodcaller, or_
 from string import digits
 from typing import Optional, SupportsIndex, TypeVar
+
+from playroom.iterpipe import Iter
 
 rdigits = digits[::-1]
 
@@ -72,3 +75,40 @@ class SentinelDict[K, V, S](dict[K, V | S]):
         return (
             f"{type(self).__name__}({self.sentinel!r}, {self.misses_limit!r}, {data})"
         )
+
+
+@dataclass(frozen=True)
+class ChainMapView[K, V](Mapping[K, V]):
+    __slots__ = "maps"
+    maps: tuple[Mapping[K, V]]
+
+    def __init__(self, *maps: Mapping[K, V]):
+        object.__setattr__(self, "maps", maps)
+
+    def get[T](self, key: K, default: T = None) -> V | T:
+        sentinel = object()
+        values = map(methodcaller("get", key, sentinel), self.maps)
+        for value in values:
+            if value is not sentinel:
+                return value
+        else:
+            return default
+
+    def copy(self, /):
+        return self
+
+    def __len__(self, /) -> int:
+        return len(set().union(*self.maps))
+
+    def __iter__(self, /) -> Iterator[K]:
+        return chain.from_iterable(self.maps)
+
+    def __reversed__(self, /) -> Iterator[K]:
+        return chain.from_iterable(map(reversed, self.maps))
+
+    def __bool__(self, /) -> bool:
+        return any(self.maps)
+
+
+a = ChainMapView[str, int]({"12": 12})
+b = a.get("12", 21.2)
