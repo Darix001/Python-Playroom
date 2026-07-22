@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import repeat
 from string import digits
-from typing import Optional, Self, TypeVar
+from typing import Optional, SupportsIndex, TypeVar
 
 rdigits = digits[::-1]
 
@@ -16,7 +16,7 @@ V = TypeVar("V")
 
 @dataclass(frozen=True)
 class KeyAwareCache[K, V](dict[K, V]):
-    __slots__ = "_factory"
+    __slots__ = "factory"
     factory: Callable[[K], V]
 
     def __init__(self, factory: Callable[[K], V], iterable=(), /, **kw):
@@ -29,22 +29,46 @@ class KeyAwareCache[K, V](dict[K, V]):
         self[key] = value = self.factory(key)
         return value
 
+    def __repr__(self, /) -> str:
+        data = super().__repr__()
+        return f"{type(self).__name__}({self.factory!r}, {data})"
 
+
+@dataclass(frozen=True)
 class SentinelDict[K, V, S](dict[K, V | S]):
-    __slots__ = "__missing__"
+    __slots__ = "__missing__", "sentinel", "misses_limit"
     __missing__: partial[S]
+    sentinel: S
+    misses_limit: SupportsIndex
 
     @property
     def factory(self, /) -> partial[S]:
         return self.__missing__
 
     def __init__(
-        self, sentinel: S, misses_limit: Optional[int] = None, /, iterable=(), **kw
+        self,
+        sentinel: S,
+        misses_limit: Optional[SupportsIndex] = None,
+        /,
+        iterable=(),
+        **kw,
     ):
-        self.__missing__ = partial(
-            next,
-            repeat(sentinel, misses_limit)
-            if misses_limit is not None
-            else repeat(sentinel),
-        )
         super().__init__(iterable, **kw)
+        object.__setattr__(
+            self,
+            "__missing__",
+            partial(
+                next,
+                repeat(sentinel, misses_limit)
+                if misses_limit is not None
+                else repeat(sentinel),
+            ),
+        )
+        object.__setattr__(self, "sentinel", sentinel)
+        object.__setattr__(self, "misses_limit", misses_limit)
+
+    def __repr__(self, /) -> str:
+        data = super().__repr__()
+        return (
+            f"{type(self).__name__}({self.sentinel!r}, {self.misses_limit!r}, {data})"
+        )

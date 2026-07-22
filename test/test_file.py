@@ -1,7 +1,10 @@
 import operator as op
+import sys
 
+sys.path.append(r"C:\Users\Daisy Garcia\Documents\Code\playroom\src")
 from more_itertools import iequals
 
+from playroom.conjectures import collatz, juggler
 from playroom.dicttools import KeyAwareCache, SentinelDict
 from playroom.fib import Fib
 from playroom.iterpipe import MutableIter, ipartial, ipipe
@@ -48,3 +51,10 @@ def test_dicttools():
     cache = KeyAwareCache(int)
     assert cache["12"] == 12
     assert cache.get("12") == 12
+
+
+def test_conjectures():
+    c = collatz(3)
+    j = juggler(3)
+    assert tuple(c) == (10, 5, 16, 8, 4, 2, 1)
+    assert tuple(j) == (5, 11, 36, 6, 2, 1)
